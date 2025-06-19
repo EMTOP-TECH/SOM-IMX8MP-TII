@@ -1,0 +1,3899 @@
+Upstream-Status: Submitted
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 3ca040cea..9f12a77d0 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -255,6 +255,8 @@ dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-revb4-ndm.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-revb4-sof-wm8962.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-revb4-rpmsg.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-revb4-rpmsg-lpv.dtb
++dtb-$(CONFIG_ARCH_MXC) += imx8mp-emtop-baseboard.dtb \
++				imx8mp-emtop-tii.dtb
+ 
+ dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk.dtb imx8mq-evk-rpmsg.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk.dtb imx8mq-evk-rpmsg.dtb imx8mq-evk-pcie1-m2.dtb imx8mq-evk-usd-wifi.dtb \
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-emtop-baseboard.dts b/arch/arm64/boot/dts/freescale/imx8mp-emtop-baseboard.dts
+new file mode 100644
+index 000000000..243639899
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/imx8mp-emtop-baseboard.dts
+@@ -0,0 +1,1313 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright 2025 Emtop
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/phy/phy-imx8-pcie.h>
++#include <dt-bindings/usb/pd.h>
++#include "imx8mp.dtsi"
++
++/ {
++	model = "Emtop i.MX8MPlus Base Board";
++	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
++
++	aliases {
++		rtc0 = &rx8025t;
++		rtc1 = &snvs_rtc;
++	};
++
++	chosen {
++		stdout-path = &uart2;
++	};
++
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x0 0x40000000 0 0xc0000000>,
++		      <0x1 0x00000000 0 0xc0000000>;
++	};
++
++	reg_usdhc2_vmmc: regulator-usdhc2 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_usdhc2_vmmc>;
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	usdhc1_pwrseq: usdhc1-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
++	};
++
++	dummy_reg: dummy-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "dummy";
++	};
++
++	modem_reset: modem-reset {
++		compatible = "gpio-reset";
++		reset-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
++		reset-delay-us = <2000>;
++		reset-post-delay-ms = <40>;
++		#reset-cells = <0>;
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		sys {
++			label = "sys";
++			gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		gsm_pwrsel {
++			label = "gsm_pwrsel";
++			gpios = <&gpio4 0 GPIO_ACTIVE_HIGH>;
++		};
++
++		gsm_pwren {
++			label = "gsm_pwren";
++			gpios = <&gpio4 20 GPIO_ACTIVE_HIGH>;
++		};
++
++		gsm_reset {
++			label = "gsm_reset";
++			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb1_pwren {
++			label = "usb1_pwren";
++			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		usb2hub_pwren {
++			label = "usb2hub_pwren";
++			gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		lvds_blten {
++			label = "lvds_blen";
++			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		s1 {
++			label = "S1";
++			gpios = <&gpio2 11 GPIO_ACTIVE_LOW>;
++			wakeup-source;
++			linux,code = <BTN_0>;
++		};
++	};
++
++	sound-hdmi {
++		compatible = "fsl,imx-audio-hdmi";
++		model = "audio-hdmi";
++		audio-cpu = <&aud2htx>;
++		hdmi-out;
++		constraint-rate = <44100>,
++			<88200>,
++			<176400>,
++			<32000>,
++			<48000>,
++			<96000>,
++			<192000>;
++		status = "okay";
++	};
++
++	sound_wm8904: sound-wm8904 {
++		compatible = "simple-audio-card";
++		#sound-dai-cells = <0>;
++		status = "okay";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,mclk-fs = <256>;
++		simple-audio-card,name = "imx8mp-wm8904";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPOUTL",
++			"Headphone Jack", "HPOUTR",
++			"IN2L", "Line In Jack",
++			"IN2R", "Line In Jack",
++			"Headphone Jack", "MICBIAS",
++			"IN1L", "Headphone Jack";
++		simple-audio-card,widgets =
++			"Microphone", "Headphone Jack",
++			"Headphone", "Headphone Jack",
++			"Line", "Line In Jack";
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&wm8904codec>;
++			clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_MCLK1>;
++		};
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai3>;
++		};
++	};
++
++	dsi_backlight_pwm: dsi_backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 1250 0>;
++		status = "okay";
++
++		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255>;
++		default-brightness-level = <200>;
++	};
++
++	lvds_backlight_pwm: lvds_backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm3 0 1250 0>;
++		status = "disabled";
++
++		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255>;
++		default-brightness-level = <200>;
++	};
++
++	pcie_refclk: pcie-refclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++	};
++
++	lvds0_panel: lvds0-panel {
++		compatible = "boe,ba104s01-100";
++		backlight = <&lvds_backlight_pwm>;
++		status = "disabled";
++
++		port {
++			panel_lvds_in: endpoint {
++				remote-endpoint = <&lvds_out>;
++			};
++		};
++	};
++};
++
++&flexspi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexspi0>;
++	status = "okay";
++
++	flash0: mt25qu256aba@0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		spi-max-frequency = <80000000>;
++		spi-tx-bus-width = <1>;
++		spi-rx-bus-width = <4>;
++	};
++};
++
++&flexcan1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
++};
++
++&A53_0 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_1 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_2 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_3 {
++	cpu-supply = <&buck2>;
++};
++
++&dsp {
++	status = "okay";
++};
++
++&aud2htx {
++	status = "okay";
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
++&ecspi2 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	fsl,spi-num-chipselects = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi2 &pinctrl_ecspi2_cs>;
++	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
++	status = "okay";
++
++	spidev1: spi@0 {
++		reg = <0>;
++		compatible = "rohm,dh2228fv";
++		spi-max-frequency = <500000>;
++	};
++};
++
++&eqos {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_eqos>;
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethphy0>;
++	snps,force_thresh_dma_mode;
++	snps,mtl-tx-config = <&mtl_tx_setup>;
++	snps,mtl-rx-config = <&mtl_rx_setup>;
++	status = "okay";
++
++	mdio {
++		compatible = "snps,dwmac-mdio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy@4 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <4>;
++			eee-broken-1000t;
++			reset-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
++			reset-assert-us = <10000>;
++			reset-deassert-us = <80000>;
++			realtek,clkout-disable;
++		};
++	};
++
++	mtl_tx_setup: tx-queues-config {
++		snps,tx-queues-to-use = <5>;
++		snps,tx-sched-sp;
++		queue0 {
++			snps,dcb-algorithm;
++			snps,priority = <0x1>;
++		};
++		queue1 {
++			snps,dcb-algorithm;
++			snps,priority = <0x2>;
++		};
++		queue2 {
++			snps,dcb-algorithm;
++			snps,priority = <0x4>;
++		};
++		queue3 {
++			snps,dcb-algorithm;
++			snps,priority = <0x8>;
++		};
++		queue4 {
++			snps,dcb-algorithm;
++			snps,priority = <0xf0>;
++		};
++	};
++	mtl_rx_setup: rx-queues-config {
++		snps,rx-queues-to-use = <5>;
++		snps,rx-sched-sp;
++		queue0 {
++			snps,dcb-algorithm;
++			snps,priority = <0x1>;
++			snps,map-to-dma-channel = <0>;
++		};
++		queue1 {
++			snps,dcb-algorithm;
++			snps,priority = <0x2>;
++			snps,map-to-dma-channel = <1>;
++		};
++		queue2 {
++			snps,dcb-algorithm;
++			snps,priority = <0x4>;
++			snps,map-to-dma-channel = <2>;
++		};
++		queue3 {
++			snps,dcb-algorithm;
++			snps,priority = <0x8>;
++			snps,map-to-dma-channel = <3>;
++		};
++		queue4 {
++			snps,dcb-algorithm;
++			snps,priority = <0xf0>;
++			snps,map-to-dma-channel = <4>;
++		};
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec>;
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethphy1>;
++	fsl,magic-packet;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy@6 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <6>;
++			eee-broken-1000t;
++			reset-gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
++			reset-assert-us = <10000>;
++			reset-deassert-us = <80000>;
++			realtek,clkout-disable;
++		};
++	};
++};
++
++&i2c1 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic@25 {
++		compatible = "nxp,pca9450c";
++		reg = <0x25>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++
++		regulators {
++			buck1: BUCK1 {
++				regulator-name = "BUCK1";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <2187500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <3125>;
++			};
++
++			buck2: BUCK2 {
++				regulator-name = "BUCK2";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <2187500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <3125>;
++				nxp,dvs-run-voltage = <950000>;
++				nxp,dvs-standby-voltage = <850000>;
++			};
++
++			buck4: BUCK4{
++				regulator-name = "BUCK4";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			buck5: BUCK5{
++				regulator-name = "BUCK5";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			buck6: BUCK6 {
++				regulator-name = "BUCK6";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo1: LDO1 {
++				regulator-name = "LDO1";
++				regulator-min-microvolt = <1600000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo2: LDO2 {
++				regulator-name = "LDO2";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo3: LDO3 {
++				regulator-name = "LDO3";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo4: LDO4 {
++				regulator-name = "LDO4";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo5: LDO5 {
++				regulator-name = "LDO5";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	goodix: touch@5d {
++		compatible = "goodix,gt911";
++		reg = <0x5d>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_touch>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
++		irq-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "disabled";
++	};
++};
++
++&snvs_rtc {
++	status = "okay";
++};
++
++&i2c3 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++
++	rx8025t: rtc@32 {
++		compatible = "epson,rx8025t";
++		reg = <0x32>;
++	};
++
++	wm8904codec: codec@1a {
++		compatible = "wlf,wm8904";
++		#sound-dai-cells = <0>;
++		reg = <0x1a>;
++		clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_MCLK1>;
++		clock-names = "mclk";
++		DCVDD-supply = <&buck5>;
++		DBVDD-supply = <&buck4>;
++		AVDD-supply = <&buck5>;
++		CPVDD-supply = <&buck5>;
++		MICVDD-supply = <&buck4>;
++		/*
++		wlf,shared-lrclk;
++		wlf,hp-cfg = <3 2 3>;
++		wlf,gpio-cfg = <1 3>;
++		*/
++	};
++
++	ov5640_1: ov5640_mipi@3c {
++		compatible = "ovti,ov5640";
++		reg = <0x3c>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_csi0_pwn>;
++		clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		clock-names = "xclk";
++		assigned-clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		assigned-clock-parents = <&clk IMX8MP_CLK_24M>;
++		assigned-clock-rates = <24000000>;
++		powerdown-gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
++		status = "okay";
++
++		port {
++			ov5640_mipi_1_ep: endpoint {
++				remote-endpoint = <&mipi_csi1_ep>;
++				data-lanes = <1 2>;
++				clock-lanes = <0>;
++			};
++		};
++	};
++};
++
++&i2c5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c5>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	ov5640_0: ov5640_mipi@3c {
++		compatible = "ovti,ov5640";
++		reg = <0x3c>;
++		pinctrl-names = "default";
++		/*
++		pinctrl-0 = <&pinctrl_csi0_pwn>;
++		*/
++		powerdown-gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
++		clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		clock-names = "xclk";
++		assigned-clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		assigned-clock-parents = <&clk IMX8MP_CLK_24M>;
++		assigned-clock-rates = <24000000>;
++		csi_id = <0>;
++		mclk = <24000000>;
++		mclk_source = <0>;
++		mipi_csi;
++		status = "okay";
++
++		port {
++			ov5640_mipi_0_ep: endpoint {
++				remote-endpoint = <&mipi_csi0_ep>;
++				data-lanes = <1 2>;
++				clock-lanes = <0>;
++			};
++		};
++	};
++};
++
++&irqsteer_hdmi {
++	status = "okay";
++};
++
++&hdmi_blk_ctrl {
++	status = "okay";
++};
++
++&hdmi_pavi {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&hdmiphy {
++	status = "okay";
++};
++
++&lcdif1 {
++	status = "okay";
++};
++
++&lcdif2 {
++	status = "okay";
++};
++
++&lcdif3 {
++	status = "okay";
++
++	thres-low  = <1 2>;             /* (FIFO * 1 / 2) */
++	thres-high = <3 4>;             /* (FIFO * 3 / 4) */
++};
++
++&ldb {
++	status = "disabled";
++
++	lvds-channel@0 {
++		fsl,data-mapping = "jeida";
++		fsl,data-width = <24>;
++		status = "okay";
++
++		port@1 {
++			reg = <1>;
++
++			lvds_out: endpoint {
++				remote-endpoint = <&panel_lvds_in>;
++			};
++		};
++	};
++};
++
++&ldb_phy {
++	status = "okay";
++};
++
++&mipi_dsi {
++	status = "disabled";
++
++	panel_mipi_70t: panel@0 {
++		compatible = "ronbo,rb070d30";
++		reg = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++		power-gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		vcc-lcd-supply = <&dummy_reg>;
++		backlight = <&dsi_backlight_pwm>;
++		status = "disabled";
++	};
++};
++
++&snvs_pwrkey {
++	status = "okay";
++};
++
++&easrc {
++	fsl,asrc-rate  = <48000>;
++	status = "okay";
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio5 21 GPIO_ACTIVE_LOW>;
++	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
++		 <&clk IMX8MP_CLK_PCIE_ROOT>,
++		 <&clk IMX8MP_CLK_HSIO_AXI>;
++	clock-names = "pcie", "pcie_aux", "pcie_bus";
++	assigned-clocks = <&clk IMX8MP_CLK_PCIE_AUX>;
++	assigned-clock-rates = <10000000>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_50M>;
++	status = "okay";
++};
++
++&pcie_phy {
++	fsl,refclk-pad-mode = <IMX8_PCIE_REFCLK_PAD_OUTPUT>;
++	clocks = <&hsio_blk_ctrl>;
++	clock-names = "ref";
++	status = "okay";
++};
++
++&sai2 {
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	assigned-clocks = <&clk IMX8MP_CLK_SAI2>;
++	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <12288000>;
++	status = "okay";
++};
++
++&sai3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai3>;
++	assigned-clocks = <&clk IMX8MP_CLK_SAI3>;
++	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <24576000>;
++	fsl,sai-mclk-direction-output;
++	status = "okay";
++};
++
++&sdma2 {
++	status = "okay";
++};
++
++&uart1 { /* BT */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART1>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	fsl,uart-has-rtscts;
++	resets = <&modem_reset>;
++	status = "okay";
++};
++
++&uart2 {
++	/* console */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&usb3_phy0 {
++	fsl,phy-tx-vref-tune = <0xe>;
++	fsl,phy-tx-preemp-amp-tune = <3>;
++	fsl,phy-tx-vboost-level = <5>;
++	fsl,phy-comp-dis-tune = <7>;
++	fsl,pcs-tx-deemph-3p5db = <0x21>;
++	fsl,phy-pcs-tx-swing-full = <0x7f>;
++	status = "okay";
++};
++
++&usb3_0 {
++	status = "okay";
++};
++
++&usb_dwc3_0 {
++	dr_mode = "host";
++	hnp-disable;
++	srp-disable;
++	adp-disable;
++	usb-role-switch;
++	role-switch-default-mode = "none";
++	snps,dis-u1-entry-quirk;
++	snps,dis-u2-entry-quirk;
++	status = "okay";
++};
++
++&usb3_phy1 {
++	fsl,phy-tx-preemp-amp-tune = <3>;
++	fsl,phy-tx-vref-tune = <0xb>;
++	status = "okay";
++};
++
++&usb3_1 {
++	status = "okay";
++};
++
++&usb_dwc3_1 {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART3>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	rts-gpios = <&gpio5 9 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++	keep-power-in-suspend;
++	non-removable;
++	wakeup-source;
++	mmc-pwrseq = <&usdhc1_pwrseq>;
++	fsl,sdio-async-interrupt-enabled;
++	status = "okay";
++
++	wifi_wake_host {
++		compatible = "nxp,wifi-wake-host";
++		interrupt-parent = <&gpio2>;
++		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "host-wake";
++	};
++};
++
++&usdhc2 {
++	assigned-clocks = <&clk IMX8MP_CLK_USDHC2>;
++	assigned-clock-rates = <400000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
++	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_usdhc2_vmmc>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&usdhc3 {
++	assigned-clocks = <&clk IMX8MP_CLK_USDHC3>;
++	assigned-clock-rates = <400000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	pinctrl_hog: hoggrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_HDMI_DDC_SCL__HDMIMIX_HDMI_SCL	0x400001c3
++			MX8MP_IOMUXC_HDMI_DDC_SDA__HDMIMIX_HDMI_SDA	0x400001c3
++			MX8MP_IOMUXC_HDMI_HPD__HDMIMIX_HDMI_HPD		0x40000019
++			MX8MP_IOMUXC_HDMI_CEC__HDMIMIX_HDMI_CEC		0x40000019
++			MX8MP_IOMUXC_SAI5_RXD3__GPIO3_IO24			0x19		/* DO1 */
++			MX8MP_IOMUXC_SAI5_MCLK__GPIO3_IO25			0x19		/* DO2 */
++			MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19			0x190		/* DIN1 */
++			MX8MP_IOMUXC_SAI1_TXD6__GPIO4_IO18			0x190		/* DIN2 */
++			/* GPIOs */
++			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09			0x19
++			MX8MP_IOMUXC_GPIO1_IO08__GPIO1_IO08			0x19
++			MX8MP_IOMUXC_SAI3_RXC__GPIO4_IO29			0x19
++			MX8MP_IOMUXC_SAI5_RXD0__GPIO3_IO21			0x19
++			MX8MP_IOMUXC_SAI2_MCLK__GPIO4_IO27			0x19
++			MX8MP_IOMUXC_ECSPI1_MISO__GPIO5_IO08		0x19
++			MX8MP_IOMUXC_SAI2_RXC__GPIO4_IO22			0x19
++			MX8MP_IOMUXC_SAI1_RXC__GPIO4_IO01			0x19
++			MX8MP_IOMUXC_SAI5_RXFS__GPIO3_IO19			0x19
++			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06			0x19
++		>;
++	};
++
++	pinctrl_pwm1: pwm1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO01__PWM1_OUT	0x116		/* DSI_BK_PWM */
++		>;
++	};
++
++	pinctrl_pwm3: pwm3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO10__PWM3_OUT	0x116		/* LVDS_BK_PWM */
++		>;
++	};
++
++	pinctrl_ecspi2: ecspi2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI2_SCLK__ECSPI2_SCLK		0x82
++			MX8MP_IOMUXC_ECSPI2_MOSI__ECSPI2_MOSI		0x82
++			MX8MP_IOMUXC_ECSPI2_MISO__ECSPI2_MISO		0x82
++		>;
++	};
++
++	pinctrl_ecspi2_cs: ecspi2cs {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI2_SS0__GPIO5_IO13		0x40000
++		>;
++	};
++
++	pinctrl_eqos: eqosgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ENET_MDC__ENET_QOS_MDC				0x3
++			MX8MP_IOMUXC_ENET_MDIO__ENET_QOS_MDIO				0x3
++			MX8MP_IOMUXC_ENET_RD0__ENET_QOS_RGMII_RD0			0x91
++			MX8MP_IOMUXC_ENET_RD1__ENET_QOS_RGMII_RD1			0x91
++			MX8MP_IOMUXC_ENET_RD2__ENET_QOS_RGMII_RD2			0x91
++			MX8MP_IOMUXC_ENET_RD3__ENET_QOS_RGMII_RD3			0x91
++			MX8MP_IOMUXC_ENET_RXC__CCM_ENET_QOS_CLOCK_GENERATE_RX_CLK	0x91
++			MX8MP_IOMUXC_ENET_RX_CTL__ENET_QOS_RGMII_RX_CTL			0x91
++			MX8MP_IOMUXC_ENET_TD0__ENET_QOS_RGMII_TD0			0x1f
++			MX8MP_IOMUXC_ENET_TD1__ENET_QOS_RGMII_TD1			0x1f
++			MX8MP_IOMUXC_ENET_TD2__ENET_QOS_RGMII_TD2			0x1f
++			MX8MP_IOMUXC_ENET_TD3__ENET_QOS_RGMII_TD3			0x1f
++			MX8MP_IOMUXC_ENET_TX_CTL__ENET_QOS_RGMII_TX_CTL			0x1f
++			MX8MP_IOMUXC_ENET_TXC__CCM_ENET_QOS_CLOCK_GENERATE_TX_CLK	0x1f
++			MX8MP_IOMUXC_GPIO1_IO11__GPIO1_IO11					0x19
++		>;
++	};
++
++	pinctrl_fec: fecgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI1_RXD2__ENET1_MDC		0x3
++			MX8MP_IOMUXC_SAI1_RXD3__ENET1_MDIO		0x3
++			MX8MP_IOMUXC_SAI1_RXD4__ENET1_RGMII_RD0		0x91
++			MX8MP_IOMUXC_SAI1_RXD5__ENET1_RGMII_RD1		0x91
++			MX8MP_IOMUXC_SAI1_RXD6__ENET1_RGMII_RD2		0x91
++			MX8MP_IOMUXC_SAI1_RXD7__ENET1_RGMII_RD3		0x91
++			MX8MP_IOMUXC_SAI1_TXD0__ENET1_RGMII_TD0		0x1f
++			MX8MP_IOMUXC_SAI1_TXD1__ENET1_RGMII_TD1		0x1f
++			MX8MP_IOMUXC_SAI1_TXD2__ENET1_RGMII_TD2		0x1f
++			MX8MP_IOMUXC_SAI1_TXD3__ENET1_RGMII_TD3		0x1f
++			MX8MP_IOMUXC_SAI1_TXD4__ENET1_RGMII_TX_CTL	0x1f
++			MX8MP_IOMUXC_SAI1_TXD5__ENET1_RGMII_TXC		0x1f
++			MX8MP_IOMUXC_SAI1_TXFS__ENET1_RGMII_RX_CTL	0x1f
++			MX8MP_IOMUXC_SAI1_TXC__ENET1_RGMII_RXC		0x1f
++			MX8MP_IOMUXC_SAI1_RXD0__GPIO4_IO02		0x19
++		>;
++	};
++
++	pinctrl_flexcan1: flexcan1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI5_RXD2__CAN1_RX			0x154
++			MX8MP_IOMUXC_SAI5_RXD1__CAN1_TX			0x154
++		>;
++	};
++
++	pinctrl_flexspi0: flexspi0grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_ALE__FLEXSPI_A_SCLK           0x1c2
++			MX8MP_IOMUXC_NAND_CE0_B__FLEXSPI_A_SS0_B        0x82
++			MX8MP_IOMUXC_NAND_DATA00__FLEXSPI_A_DATA00      0x82
++			MX8MP_IOMUXC_NAND_DATA01__FLEXSPI_A_DATA01      0x82
++			MX8MP_IOMUXC_NAND_DATA02__FLEXSPI_A_DATA02      0x82
++			MX8MP_IOMUXC_NAND_DATA03__FLEXSPI_A_DATA03      0x82
++		>;
++	};
++
++	pinctrl_gpio_leds: gpioledgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_READY_B__GPIO3_IO16	0x19
++			/* 4G/5G: PWRSEL */
++			MX8MP_IOMUXC_SAI1_RXFS__GPIO4_IO00		0x19
++			/* 4G/5G: RESET */
++			MX8MP_IOMUXC_NAND_DQS__GPIO3_IO14		0x19
++			/* 4G/5G: PWREN */
++			MX8MP_IOMUXC_SAI1_MCLK__GPIO4_IO20		0x19
++			/* USB1: PWREN */
++			MX8MP_IOMUXC_GPIO1_IO07__GPIO1_IO07		0x19
++			/* USB2HUB: PWREN */
++			MX8MP_IOMUXC_GPIO1_IO15__GPIO1_IO15		0x19
++			/* LVDS_BK_EN */
++			MX8MP_IOMUXC_GPIO1_IO13__GPIO1_IO13		0x19
++		>;
++	};
++
++	pinctrl_gpio_keys: gpiokeys {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_STROBE__GPIO2_IO11		0x1d9
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C1_SCL__I2C1_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C1_SDA__I2C1_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C2_SCL__I2C2_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C2_SDA__I2C2_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C3_SCL__I2C3_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C3_SDA__I2C3_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c5: i2c5grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SPDIF_TX__I2C5_SCL		0x400001c2
++			MX8MP_IOMUXC_SPDIF_RX__I2C5_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_pcie: pciegrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C4_SCL__PCIE_CLKREQ_B	0x61 /* open drain, pull up */
++			MX8MP_IOMUXC_I2C4_SDA__GPIO5_IO21		0x1c4
++		>;
++	};
++
++	pinctrl_pmic: pmicgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO03__GPIO1_IO03	0x000001c0
++		>;
++	};
++
++	pinctrl_reg_usdhc2_vmmc: regusdhc2vmmcgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_RESET_B__GPIO2_IO19	0x41
++		>;
++	};
++
++	pinctrl_sai2: sai2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI2_TXC__AUDIOMIX_SAI2_TX_BCLK	0xd6
++			MX8MP_IOMUXC_SAI2_TXFS__AUDIOMIX_SAI2_TX_SYNC	0xd6
++			MX8MP_IOMUXC_SAI2_TXD0__AUDIOMIX_SAI2_TX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI2_RXD0__AUDIOMIX_SAI2_RX_DATA00	0xd6
++		>;
++	};
++
++	pinctrl_sai3: sai3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI3_TXFS__AUDIOMIX_SAI3_TX_SYNC	0xd6
++			MX8MP_IOMUXC_SAI3_TXC__AUDIOMIX_SAI3_TX_BCLK	0xd6
++			MX8MP_IOMUXC_SAI3_RXD__AUDIOMIX_SAI3_RX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI3_TXD__AUDIOMIX_SAI3_TX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI3_MCLK__AUDIOMIX_SAI3_MCLK	0xd6
++			MX8MP_IOMUXC_SAI3_RXFS__GPIO4_IO28		0xd6
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_UART1_RXD__UART1_DCE_RX	0x140
++			MX8MP_IOMUXC_UART1_TXD__UART1_DCE_TX	0x140
++			MX8MP_IOMUXC_UART3_RXD__UART1_DCE_CTS	0x140
++			MX8MP_IOMUXC_UART3_TXD__UART1_DCE_RTS	0x140
++			MX8MP_IOMUXC_GPIO1_IO00__ANAMIX_REF_CLK_32K	0x141
++			MX8MP_IOMUXC_SD1_DATA4__GPIO2_IO06		0x19
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_UART2_RXD__UART2_DCE_RX	0x140
++			MX8MP_IOMUXC_UART2_TXD__UART2_DCE_TX	0x140
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI1_SCLK__UART3_DCE_RX		0x140
++			MX8MP_IOMUXC_ECSPI1_MOSI__UART3_DCE_TX		0x140
++			MX8MP_IOMUXC_ECSPI1_SS0__GPIO5_IO09			0x140
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x190
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d0
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d0
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d0
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d0
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d0
++			/* WL_REG_ON */
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			/* WL_WAKE_HOST */
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc1_100mhz: usdhc1-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x194
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d4
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d4
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d4
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d4
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d4
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc1_200mhz: usdhc1-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x196
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d6
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d6
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d6
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d6
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d6
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x190
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d0
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d0
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d0
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d0
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d0
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT	0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_100mhz: usdhc2-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x194
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d4
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d4
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d4
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d4
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d4
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT 0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_200mhz: usdhc2-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x196
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d6
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d6
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d6
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d6
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d6
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT 0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_gpio: usdhc2gpiogrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CD_B__GPIO2_IO12	0x1c4
++		>;
++	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x190
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d0
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d0
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d0
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d0
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d0
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d0
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d0
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d0
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d0
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x190
++		>;
++	};
++
++	pinctrl_usdhc3_100mhz: usdhc3-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x194
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d4
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d4
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d4
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d4
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d4
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d4
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d4
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d4
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d4
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x194
++		>;
++	};
++
++	pinctrl_usdhc3_200mhz: usdhc3-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x196
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d6
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d6
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d6
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d6
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d6
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d6
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d6
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d6
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d6
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x196
++		>;
++	};
++
++	pinctrl_wdog: wdoggrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO02__WDOG1_WDOG_B	0x166
++		>;
++	};
++
++	pinctrl_csi0_pwn: csi0_pwn_grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI5_RXC__GPIO3_IO20		0x19
++		>;
++	};
++
++	pinctrl_mipi_dsi_en: mipi_dsi_engrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO05__GPIO1_IO05		0x19
++		>;
++	};
++
++	pinctrl_touch: touchgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO14__GPIO1_IO14		0x19		/* CTP_RST */
++			MX8MP_IOMUXC_GPIO1_IO12__GPIO1_IO12		0x19		/* CTP_INT */
++		>;
++	};
++};
++
++&vpu_g1 {
++	status = "okay";
++};
++
++&vpu_g2 {
++	status = "okay";
++};
++
++&vpu_vc8000e {
++	status = "okay";
++};
++
++&vpu_v4l2 {
++	status = "okay";
++};
++
++&gpu_3d {
++	status = "okay";
++};
++
++&gpu_2d {
++	status = "okay";
++};
++
++&ml_vipsi {
++	status = "okay";
++};
++
++&mix_gpu_ml {
++	status = "okay";
++};
++
++&mipi_csi_0 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	port@0 {
++		reg = <0>;
++		mipi_csi0_ep: endpoint {
++			remote-endpoint = <&ov5640_mipi_0_ep>;
++			data-lanes = <2>;
++			csis-hs-settle = <13>;
++			csis-clk-settle = <2>;
++			csis-wclk;
++		};
++	};
++};
++
++&mipi_csi_1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	port@1 {
++		reg = <1>;
++		mipi_csi1_ep: endpoint {
++			remote-endpoint = <&ov5640_mipi_1_ep>;
++			data-lanes = <2>;
++			csis-hs-settle = <13>;
++			csis-clk-settle = <2>;
++			csis-wclk;
++		};
++	};
++};
++
++&cameradev {
++	status = "okay";
++};
++
++&isi_0 {
++	status = "okay";
++
++	cap_device {
++		status = "okay";
++	};
++
++	m2m_device {
++		status = "okay";
++	};
++};
++
++&isi_1 {
++	status = "okay";
++
++	cap_device {
++		status = "okay";
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-emtop-tii.dts b/arch/arm64/boot/dts/freescale/imx8mp-emtop-tii.dts
+new file mode 100644
+index 000000000..ab375e445
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/imx8mp-emtop-tii.dts
+@@ -0,0 +1,1119 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright 2025 Emtop
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/phy/phy-imx8-pcie.h>
++#include <dt-bindings/usb/pd.h>
++#include "imx8mp.dtsi"
++
++/ {
++	model = "Emtop i.MX8MPlus Base Board";
++	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
++
++	aliases {
++		rtc0 = &rx8025t;
++		rtc1 = &snvs_rtc;
++	};
++
++	chosen {
++		stdout-path = &uart2;
++	};
++
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x0 0x40000000 0 0xc0000000>,
++		      <0x1 0x00000000 0 0xc0000000>;
++	};
++
++	reg_usdhc2_vmmc: regulator-usdhc2 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_usdhc2_vmmc>;
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	usdhc1_pwrseq: usdhc1-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
++	};
++
++	dummy_reg: dummy-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "dummy";
++	};
++
++	modem_reset: modem-reset {
++		compatible = "gpio-reset";
++		reset-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
++		reset-delay-us = <2000>;
++		reset-post-delay-ms = <40>;
++		#reset-cells = <0>;
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		sys {
++			label = "sys";
++			gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		usb1_pwren {
++			label = "usb1_pwren";
++			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	sound-hdmi {
++		compatible = "fsl,imx-audio-hdmi";
++		model = "audio-hdmi";
++		audio-cpu = <&aud2htx>;
++		hdmi-out;
++		constraint-rate = <44100>,
++			<88200>,
++			<176400>,
++			<32000>,
++			<48000>,
++			<96000>,
++			<192000>;
++		status = "okay";
++	};
++
++	sound_wm8904: sound-wm8904 {
++		compatible = "simple-audio-card";
++		#sound-dai-cells = <0>;
++		status = "okay";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,mclk-fs = <256>;
++		simple-audio-card,name = "imx8mp-wm8904";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPOUTL",
++			"Headphone Jack", "HPOUTR",
++			"IN2L", "Line In Jack",
++			"IN2R", "Line In Jack",
++			"Headphone Jack", "MICBIAS",
++			"IN1L", "Headphone Jack";
++		simple-audio-card,widgets =
++			"Microphone", "Headphone Jack",
++			"Headphone", "Headphone Jack",
++			"Line", "Line In Jack";
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&wm8904codec>;
++			clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_MCLK1>;
++		};
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai3>;
++		};
++	};
++};
++
++&flexspi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexspi0>;
++	status = "okay";
++};
++
++&flexcan1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
++};
++
++&A53_0 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_1 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_2 {
++	cpu-supply = <&buck2>;
++};
++
++&A53_3 {
++	cpu-supply = <&buck2>;
++};
++
++&dsp {
++	status = "okay";
++};
++
++&aud2htx {
++	status = "okay";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
++&ecspi2 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	fsl,spi-num-chipselects = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi2 &pinctrl_ecspi2_cs>;
++	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
++	status = "okay";
++
++	spidev1: spi@0 {
++		reg = <0>;
++		compatible = "rohm,dh2228fv";
++		spi-max-frequency = <500000>;
++	};
++};
++
++&eqos {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_eqos>;
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethphy0>;
++	snps,force_thresh_dma_mode;
++	snps,mtl-tx-config = <&mtl_tx_setup>;
++	snps,mtl-rx-config = <&mtl_rx_setup>;
++	status = "okay";
++
++	mdio {
++		compatible = "snps,dwmac-mdio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy@4 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <4>;
++			eee-broken-1000t;
++			reset-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
++			reset-assert-us = <10000>;
++			reset-deassert-us = <80000>;
++			realtek,clkout-disable;
++		};
++	};
++
++	mtl_tx_setup: tx-queues-config {
++		snps,tx-queues-to-use = <5>;
++		snps,tx-sched-sp;
++		queue0 {
++			snps,dcb-algorithm;
++			snps,priority = <0x1>;
++		};
++		queue1 {
++			snps,dcb-algorithm;
++			snps,priority = <0x2>;
++		};
++		queue2 {
++			snps,dcb-algorithm;
++			snps,priority = <0x4>;
++		};
++		queue3 {
++			snps,dcb-algorithm;
++			snps,priority = <0x8>;
++		};
++		queue4 {
++			snps,dcb-algorithm;
++			snps,priority = <0xf0>;
++		};
++	};
++	mtl_rx_setup: rx-queues-config {
++		snps,rx-queues-to-use = <5>;
++		snps,rx-sched-sp;
++		queue0 {
++			snps,dcb-algorithm;
++			snps,priority = <0x1>;
++			snps,map-to-dma-channel = <0>;
++		};
++		queue1 {
++			snps,dcb-algorithm;
++			snps,priority = <0x2>;
++			snps,map-to-dma-channel = <1>;
++		};
++		queue2 {
++			snps,dcb-algorithm;
++			snps,priority = <0x4>;
++			snps,map-to-dma-channel = <2>;
++		};
++		queue3 {
++			snps,dcb-algorithm;
++			snps,priority = <0x8>;
++			snps,map-to-dma-channel = <3>;
++		};
++		queue4 {
++			snps,dcb-algorithm;
++			snps,priority = <0xf0>;
++			snps,map-to-dma-channel = <4>;
++		};
++	};
++};
++
++&i2c1 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic@25 {
++		compatible = "nxp,pca9450c";
++		reg = <0x25>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++
++		regulators {
++			buck1: BUCK1 {
++				regulator-name = "BUCK1";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <2187500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <3125>;
++			};
++
++			buck2: BUCK2 {
++				regulator-name = "BUCK2";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <2187500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <3125>;
++				nxp,dvs-run-voltage = <950000>;
++				nxp,dvs-standby-voltage = <850000>;
++			};
++
++			buck4: BUCK4{
++				regulator-name = "BUCK4";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			buck5: BUCK5{
++				regulator-name = "BUCK5";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			buck6: BUCK6 {
++				regulator-name = "BUCK6";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <3400000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo1: LDO1 {
++				regulator-name = "LDO1";
++				regulator-min-microvolt = <1600000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo2: LDO2 {
++				regulator-name = "LDO2";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo3: LDO3 {
++				regulator-name = "LDO3";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo4: LDO4 {
++				regulator-name = "LDO4";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo5: LDO5 {
++				regulator-name = "LDO5";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	goodix: touch@5d {
++		compatible = "goodix,gt911";
++		reg = <0x5d>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_touch>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
++		irq-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "disabled";
++	};
++};
++
++&snvs_rtc {
++	status = "okay";
++};
++
++&i2c3 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++
++	rx8025t: rtc@32 {
++		compatible = "epson,rx8025t";
++		reg = <0x32>;
++	};
++
++	wm8904codec: codec@1a {
++		compatible = "wlf,wm8904";
++		#sound-dai-cells = <0>;
++		reg = <0x1a>;
++		clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIOMIX_SAI3_MCLK1>;
++		clock-names = "mclk";
++		DCVDD-supply = <&buck5>;
++		DBVDD-supply = <&buck4>;
++		AVDD-supply = <&buck5>;
++		CPVDD-supply = <&buck5>;
++		MICVDD-supply = <&buck4>;
++		/*
++		wlf,shared-lrclk;
++		wlf,hp-cfg = <3 2 3>;
++		wlf,gpio-cfg = <1 3>;
++		*/
++	};
++
++	ov5640_1: ov5640_mipi@3c {
++		compatible = "ovti,ov5640";
++		reg = <0x3c>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_csi0_pwn>;
++		clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		clock-names = "xclk";
++		assigned-clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		assigned-clock-parents = <&clk IMX8MP_CLK_24M>;
++		assigned-clock-rates = <24000000>;
++		powerdown-gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
++		status = "okay";
++
++		port {
++			ov5640_mipi_1_ep: endpoint {
++				remote-endpoint = <&mipi_csi1_ep>;
++				data-lanes = <1 2>;
++				clock-lanes = <0>;
++			};
++		};
++	};
++};
++
++&i2c5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c5>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	ov5640_0: ov5640_mipi@3c {
++		compatible = "ovti,ov5640";
++		reg = <0x3c>;
++		pinctrl-names = "default";
++		/*
++		pinctrl-0 = <&pinctrl_csi0_pwn>;
++		*/
++		powerdown-gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
++		clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		clock-names = "xclk";
++		assigned-clocks = <&clk IMX8MP_CLK_IPP_DO_CLKO2>;
++		assigned-clock-parents = <&clk IMX8MP_CLK_24M>;
++		assigned-clock-rates = <24000000>;
++		csi_id = <0>;
++		mclk = <24000000>;
++		mclk_source = <0>;
++		mipi_csi;
++		status = "okay";
++
++		port {
++			ov5640_mipi_0_ep: endpoint {
++				remote-endpoint = <&mipi_csi0_ep>;
++				data-lanes = <1 2>;
++				clock-lanes = <0>;
++			};
++		};
++	};
++};
++
++&irqsteer_hdmi {
++	status = "okay";
++};
++
++&hdmi_blk_ctrl {
++	status = "okay";
++};
++
++&hdmi_pavi {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&hdmiphy {
++	status = "okay";
++};
++
++&lcdif1 {
++	status = "okay";
++};
++
++&lcdif2 {
++	status = "okay";
++};
++
++&lcdif3 {
++	status = "okay";
++
++	thres-low  = <1 2>;             /* (FIFO * 1 / 2) */
++	thres-high = <3 4>;             /* (FIFO * 3 / 4) */
++};
++
++&snvs_pwrkey {
++	status = "okay";
++};
++
++&easrc {
++	fsl,asrc-rate  = <48000>;
++	status = "okay";
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio5 21 GPIO_ACTIVE_LOW>;
++	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
++		 <&clk IMX8MP_CLK_PCIE_ROOT>,
++		 <&clk IMX8MP_CLK_HSIO_AXI>;
++	clock-names = "pcie", "pcie_aux", "pcie_bus";
++	assigned-clocks = <&clk IMX8MP_CLK_PCIE_AUX>;
++	assigned-clock-rates = <10000000>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_50M>;
++	status = "okay";
++};
++
++&pcie_phy {
++	fsl,refclk-pad-mode = <IMX8_PCIE_REFCLK_PAD_OUTPUT>;
++	clocks = <&hsio_blk_ctrl>;
++	clock-names = "ref";
++	status = "okay";
++};
++
++&sai2 {
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	assigned-clocks = <&clk IMX8MP_CLK_SAI2>;
++	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <12288000>;
++	status = "okay";
++};
++
++&sai3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai3>;
++	assigned-clocks = <&clk IMX8MP_CLK_SAI3>;
++	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <24576000>;
++	fsl,sai-mclk-direction-output;
++	status = "okay";
++};
++
++&sdma2 {
++	status = "okay";
++};
++
++&uart1 { /* BT */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART1>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	fsl,uart-has-rtscts;
++	resets = <&modem_reset>;
++	status = "okay";
++};
++
++&uart2 {
++	/* console */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&usb3_phy0 {
++	fsl,phy-tx-vref-tune = <0xe>;
++	fsl,phy-tx-preemp-amp-tune = <3>;
++	fsl,phy-tx-vboost-level = <5>;
++	fsl,phy-comp-dis-tune = <7>;
++	fsl,pcs-tx-deemph-3p5db = <0x21>;
++	fsl,phy-pcs-tx-swing-full = <0x7f>;
++	status = "okay";
++};
++
++&usb3_0 {
++	status = "okay";
++};
++
++&usb_dwc3_0 {
++	dr_mode = "host";
++	hnp-disable;
++	srp-disable;
++	adp-disable;
++	usb-role-switch;
++	role-switch-default-mode = "none";
++	snps,dis-u1-entry-quirk;
++	snps,dis-u2-entry-quirk;
++	status = "okay";
++};
++
++&usb3_phy1 {
++	fsl,phy-tx-preemp-amp-tune = <3>;
++	fsl,phy-tx-vref-tune = <0xb>;
++	status = "okay";
++};
++
++&usb3_1 {
++	status = "okay";
++};
++
++&usb_dwc3_1 {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART3>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	rts-gpios = <&gpio5 9 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++	keep-power-in-suspend;
++	non-removable;
++	wakeup-source;
++	mmc-pwrseq = <&usdhc1_pwrseq>;
++	fsl,sdio-async-interrupt-enabled;
++	status = "okay";
++
++	wifi_wake_host {
++		compatible = "nxp,wifi-wake-host";
++		interrupt-parent = <&gpio2>;
++		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "host-wake";
++	};
++};
++
++&usdhc2 {
++	assigned-clocks = <&clk IMX8MP_CLK_USDHC2>;
++	assigned-clock-rates = <400000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
++	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_usdhc2_vmmc>;
++	bus-width = <4>;
++	max-frequency = <100000000>;		/* due to FSSD06BQX limit */
++	status = "okay";
++};
++
++&usdhc3 {
++	assigned-clocks = <&clk IMX8MP_CLK_USDHC3>;
++	assigned-clock-rates = <400000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	pinctrl_hog: hoggrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_HDMI_DDC_SCL__HDMIMIX_HDMI_SCL	0x400001c3
++			MX8MP_IOMUXC_HDMI_DDC_SDA__HDMIMIX_HDMI_SDA	0x400001c3
++			MX8MP_IOMUXC_HDMI_HPD__HDMIMIX_HDMI_HPD		0x40000019
++			MX8MP_IOMUXC_HDMI_CEC__HDMIMIX_HDMI_CEC		0x40000019
++			MX8MP_IOMUXC_SAI5_RXD3__GPIO3_IO24			0x19		/* DO1 */
++			MX8MP_IOMUXC_SAI5_MCLK__GPIO3_IO25			0x19		/* DO2 */
++			MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19			0x190		/* DIN1 */
++			MX8MP_IOMUXC_SAI1_TXD6__GPIO4_IO18			0x190		/* DIN2 */
++			/* GPIOs */
++			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09			0x19
++			MX8MP_IOMUXC_GPIO1_IO08__GPIO1_IO08			0x19
++			MX8MP_IOMUXC_SAI3_RXC__GPIO4_IO29			0x19
++			MX8MP_IOMUXC_SAI5_RXD0__GPIO3_IO21			0x19
++			MX8MP_IOMUXC_SAI2_MCLK__GPIO4_IO27			0x19
++			MX8MP_IOMUXC_ECSPI1_MISO__GPIO5_IO08		0x19
++			MX8MP_IOMUXC_SAI2_RXC__GPIO4_IO22			0x19
++			MX8MP_IOMUXC_SAI1_RXC__GPIO4_IO01			0x19
++			MX8MP_IOMUXC_SAI5_RXFS__GPIO3_IO19			0x19
++			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06			0x19
++		>;
++	};
++
++	pinctrl_pwm3: pwm3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO10__PWM3_OUT	0x116		/* LVDS_BK_PWM */
++		>;
++	};
++
++	pinctrl_ecspi2: ecspi2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI2_SCLK__ECSPI2_SCLK		0x82
++			MX8MP_IOMUXC_ECSPI2_MOSI__ECSPI2_MOSI		0x82
++			MX8MP_IOMUXC_ECSPI2_MISO__ECSPI2_MISO		0x82
++		>;
++	};
++
++	pinctrl_ecspi2_cs: ecspi2cs {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI2_SS0__GPIO5_IO13		0x40000
++		>;
++	};
++
++	pinctrl_eqos: eqosgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ENET_MDC__ENET_QOS_MDC				0x3
++			MX8MP_IOMUXC_ENET_MDIO__ENET_QOS_MDIO				0x3
++			MX8MP_IOMUXC_ENET_RD0__ENET_QOS_RGMII_RD0			0x91
++			MX8MP_IOMUXC_ENET_RD1__ENET_QOS_RGMII_RD1			0x91
++			MX8MP_IOMUXC_ENET_RD2__ENET_QOS_RGMII_RD2			0x91
++			MX8MP_IOMUXC_ENET_RD3__ENET_QOS_RGMII_RD3			0x91
++			MX8MP_IOMUXC_ENET_RXC__CCM_ENET_QOS_CLOCK_GENERATE_RX_CLK	0x91
++			MX8MP_IOMUXC_ENET_RX_CTL__ENET_QOS_RGMII_RX_CTL			0x91
++			MX8MP_IOMUXC_ENET_TD0__ENET_QOS_RGMII_TD0			0x1f
++			MX8MP_IOMUXC_ENET_TD1__ENET_QOS_RGMII_TD1			0x1f
++			MX8MP_IOMUXC_ENET_TD2__ENET_QOS_RGMII_TD2			0x1f
++			MX8MP_IOMUXC_ENET_TD3__ENET_QOS_RGMII_TD3			0x1f
++			MX8MP_IOMUXC_ENET_TX_CTL__ENET_QOS_RGMII_TX_CTL			0x1f
++			MX8MP_IOMUXC_ENET_TXC__CCM_ENET_QOS_CLOCK_GENERATE_TX_CLK	0x1f
++			MX8MP_IOMUXC_GPIO1_IO11__GPIO1_IO11					0x19
++		>;
++	};
++
++	pinctrl_flexcan1: flexcan1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI5_RXD2__CAN1_RX			0x154
++			MX8MP_IOMUXC_SAI5_RXD1__CAN1_TX			0x154
++		>;
++	};
++
++	pinctrl_flexspi0: flexspi0grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_ALE__FLEXSPI_A_SCLK           0x1c2
++			MX8MP_IOMUXC_NAND_CE0_B__FLEXSPI_A_SS0_B        0x82
++			MX8MP_IOMUXC_NAND_DATA00__FLEXSPI_A_DATA00      0x82
++			MX8MP_IOMUXC_NAND_DATA01__FLEXSPI_A_DATA01      0x82
++			MX8MP_IOMUXC_NAND_DATA02__FLEXSPI_A_DATA02      0x82
++			MX8MP_IOMUXC_NAND_DATA03__FLEXSPI_A_DATA03      0x82
++		>;
++	};
++
++	pinctrl_gpio_leds: gpioledgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_READY_B__GPIO3_IO16	0x19
++			/* USB1: PWREN */
++			MX8MP_IOMUXC_GPIO1_IO07__GPIO1_IO07		0x19
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C1_SCL__I2C1_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C1_SDA__I2C1_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C2_SCL__I2C2_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C2_SDA__I2C2_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C3_SCL__I2C3_SCL		0x400001c2
++			MX8MP_IOMUXC_I2C3_SDA__I2C3_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_i2c5: i2c5grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SPDIF_TX__I2C5_SCL		0x400001c2
++			MX8MP_IOMUXC_SPDIF_RX__I2C5_SDA		0x400001c2
++		>;
++	};
++
++	pinctrl_pcie: pciegrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C4_SCL__PCIE_CLKREQ_B	0x61 /* open drain, pull up */
++			MX8MP_IOMUXC_I2C4_SDA__GPIO5_IO21		0x1c4
++		>;
++	};
++
++	pinctrl_pmic: pmicgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO03__GPIO1_IO03	0x000001c0
++		>;
++	};
++
++	pinctrl_reg_usdhc2_vmmc: regusdhc2vmmcgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_RESET_B__GPIO2_IO19	0x41
++		>;
++	};
++
++	pinctrl_sai2: sai2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI2_TXC__AUDIOMIX_SAI2_TX_BCLK	0xd6
++			MX8MP_IOMUXC_SAI2_TXFS__AUDIOMIX_SAI2_TX_SYNC	0xd6
++			MX8MP_IOMUXC_SAI2_TXD0__AUDIOMIX_SAI2_TX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI2_RXD0__AUDIOMIX_SAI2_RX_DATA00	0xd6
++		>;
++	};
++
++	pinctrl_sai3: sai3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI3_TXFS__AUDIOMIX_SAI3_TX_SYNC	0xd6
++			MX8MP_IOMUXC_SAI3_TXC__AUDIOMIX_SAI3_TX_BCLK	0xd6
++			MX8MP_IOMUXC_SAI3_RXD__AUDIOMIX_SAI3_RX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI3_TXD__AUDIOMIX_SAI3_TX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI3_MCLK__AUDIOMIX_SAI3_MCLK	0xd6
++			MX8MP_IOMUXC_SAI3_RXFS__GPIO4_IO28		0xd6
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_UART1_RXD__UART1_DCE_RX	0x140
++			MX8MP_IOMUXC_UART1_TXD__UART1_DCE_TX	0x140
++			MX8MP_IOMUXC_UART3_RXD__UART1_DCE_CTS	0x140
++			MX8MP_IOMUXC_UART3_TXD__UART1_DCE_RTS	0x140
++			MX8MP_IOMUXC_GPIO1_IO00__ANAMIX_REF_CLK_32K	0x141
++			MX8MP_IOMUXC_SD1_DATA4__GPIO2_IO06		0x19
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_UART2_RXD__UART2_DCE_RX	0x140
++			MX8MP_IOMUXC_UART2_TXD__UART2_DCE_TX	0x140
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI1_SCLK__UART3_DCE_RX		0x140
++			MX8MP_IOMUXC_ECSPI1_MOSI__UART3_DCE_TX		0x140
++			MX8MP_IOMUXC_ECSPI1_SS0__GPIO5_IO09			0x140
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x190
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d0
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d0
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d0
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d0
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d0
++			/* WL_REG_ON */
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			/* WL_WAKE_HOST */
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc1_100mhz: usdhc1-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x194
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d4
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d4
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d4
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d4
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d4
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc1_200mhz: usdhc1-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_CLK__USDHC1_CLK		0x196
++			MX8MP_IOMUXC_SD1_CMD__USDHC1_CMD		0x1d6
++			MX8MP_IOMUXC_SD1_DATA0__USDHC1_DATA0	0x1d6
++			MX8MP_IOMUXC_SD1_DATA1__USDHC1_DATA1	0x1d6
++			MX8MP_IOMUXC_SD1_DATA2__USDHC1_DATA2	0x1d6
++			MX8MP_IOMUXC_SD1_DATA3__USDHC1_DATA3	0x1d6
++			MX8MP_IOMUXC_SD1_RESET_B__GPIO2_IO10	0x19
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x190
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d0
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d0
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d0
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d0
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d0
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT	0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_100mhz: usdhc2-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x194
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d4
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d4
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d4
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d4
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d4
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT 0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_200mhz: usdhc2-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x196
++			MX8MP_IOMUXC_SD2_CMD__USDHC2_CMD	0x1d6
++			MX8MP_IOMUXC_SD2_DATA0__USDHC2_DATA0	0x1d6
++			MX8MP_IOMUXC_SD2_DATA1__USDHC2_DATA1	0x1d6
++			MX8MP_IOMUXC_SD2_DATA2__USDHC2_DATA2	0x1d6
++			MX8MP_IOMUXC_SD2_DATA3__USDHC2_DATA3	0x1d6
++			MX8MP_IOMUXC_GPIO1_IO04__USDHC2_VSELECT 0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_gpio: usdhc2gpiogrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD2_CD_B__GPIO2_IO12	0x1c4
++		>;
++	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x190
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d0
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d0
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d0
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d0
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d0
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d0
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d0
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d0
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d0
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x190
++		>;
++	};
++
++	pinctrl_usdhc3_100mhz: usdhc3-100mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x194
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d4
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d4
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d4
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d4
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d4
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d4
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d4
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d4
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d4
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x194
++		>;
++	};
++
++	pinctrl_usdhc3_200mhz: usdhc3-200mhzgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_NAND_WE_B__USDHC3_CLK	0x196
++			MX8MP_IOMUXC_NAND_WP_B__USDHC3_CMD	0x1d6
++			MX8MP_IOMUXC_NAND_DATA04__USDHC3_DATA0	0x1d6
++			MX8MP_IOMUXC_NAND_DATA05__USDHC3_DATA1	0x1d6
++			MX8MP_IOMUXC_NAND_DATA06__USDHC3_DATA2	0x1d6
++			MX8MP_IOMUXC_NAND_DATA07__USDHC3_DATA3	0x1d6
++			MX8MP_IOMUXC_NAND_RE_B__USDHC3_DATA4	0x1d6
++			MX8MP_IOMUXC_NAND_CE2_B__USDHC3_DATA5	0x1d6
++			MX8MP_IOMUXC_NAND_CE3_B__USDHC3_DATA6	0x1d6
++			MX8MP_IOMUXC_NAND_CLE__USDHC3_DATA7	0x1d6
++			MX8MP_IOMUXC_NAND_CE1_B__USDHC3_STROBE	0x196
++		>;
++	};
++
++	pinctrl_wdog: wdoggrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO02__WDOG1_WDOG_B	0x166
++		>;
++	};
++
++	pinctrl_csi0_pwn: csi0_pwn_grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI5_RXC__GPIO3_IO20		0x19
++		>;
++	};
++
++	pinctrl_mipi_dsi_en: mipi_dsi_engrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO05__GPIO1_IO05		0x19
++		>;
++	};
++
++	pinctrl_touch: touchgrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO14__GPIO1_IO14		0x19		/* CTP_RST */
++			MX8MP_IOMUXC_GPIO1_IO12__GPIO1_IO12		0x19		/* CTP_INT */
++		>;
++	};
++};
++
++&vpu_g1 {
++	status = "okay";
++};
++
++&vpu_g2 {
++	status = "okay";
++};
++
++&vpu_vc8000e {
++	status = "okay";
++};
++
++&vpu_v4l2 {
++	status = "okay";
++};
++
++&gpu_3d {
++	status = "okay";
++};
++
++&gpu_2d {
++	status = "okay";
++};
++
++&ml_vipsi {
++	status = "okay";
++};
++
++&mix_gpu_ml {
++	status = "okay";
++};
++
++&mipi_csi_0 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	port@0 {
++		reg = <0>;
++		mipi_csi0_ep: endpoint {
++			remote-endpoint = <&ov5640_mipi_0_ep>;
++			data-lanes = <2>;
++			csis-hs-settle = <13>;
++			csis-clk-settle = <2>;
++			csis-wclk;
++		};
++	};
++};
++
++&mipi_csi_1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	port@1 {
++		reg = <1>;
++		mipi_csi1_ep: endpoint {
++			remote-endpoint = <&ov5640_mipi_1_ep>;
++			data-lanes = <2>;
++			csis-hs-settle = <13>;
++			csis-clk-settle = <2>;
++			csis-wclk;
++		};
++	};
++};
++
++&cameradev {
++	status = "okay";
++};
++
++&isi_0 {
++	status = "okay";
++
++	cap_device {
++		status = "okay";
++	};
++
++	m2m_device {
++		status = "okay";
++	};
++};
++
++&isi_1 {
++	status = "okay";
++
++	cap_device {
++		status = "okay";
++	};
++};
+diff --git a/arch/arm64/configs/emtop_imx8m_defconfig b/arch/arm64/configs/emtop_imx8m_defconfig
+new file mode 100644
+index 000000000..633f422a3
+--- /dev/null
++++ b/arch/arm64/configs/emtop_imx8m_defconfig
+@@ -0,0 +1,1221 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_AUDIT=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BPF_SYSCALL=y
++CONFIG_BPF_JIT=y
++CONFIG_PREEMPT=y
++CONFIG_IRQ_TIME_ACCOUNTING=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++CONFIG_TASKSTATS=y
++CONFIG_TASK_XACCT=y
++CONFIG_TASK_IO_ACCOUNTING=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_NUMA_BALANCING=y
++CONFIG_MEMCG=y
++CONFIG_BLK_CGROUP=y
++CONFIG_CGROUP_PIDS=y
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_HUGETLB=y
++CONFIG_CPUSETS=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_CGROUP_PERF=y
++CONFIG_CGROUP_BPF=y
++CONFIG_USER_NS=y
++CONFIG_SCHED_AUTOGROUP=y
++CONFIG_RELAY=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_PROFILING=y
++CONFIG_ARCH_KEEMBAY=y
++CONFIG_ARCH_NXP=y
++CONFIG_ARCH_LAYERSCAPE=y
++CONFIG_ARCH_MXC=y
++CONFIG_ARCH_S32=y
++CONFIG_SOC_S32V234=y
++CONFIG_ARM64_VA_BITS_48=y
++CONFIG_SCHED_MC=y
++CONFIG_SCHED_SMT=y
++CONFIG_NUMA=y
++CONFIG_KEXEC=y
++CONFIG_KEXEC_FILE=y
++CONFIG_CRASH_DUMP=y
++CONFIG_XEN=y
++CONFIG_ARCH_FORCE_MAX_ORDER=13
++CONFIG_COMPAT=y
++CONFIG_RANDOMIZE_BASE=y
++CONFIG_PM_DEBUG=y
++CONFIG_PM_TEST_SUSPEND=y
++CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
++CONFIG_ENERGY_MODEL=y
++CONFIG_ARM_PSCI_CPUIDLE=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
++CONFIG_CPUFREQ_DT=y
++CONFIG_ACPI_CPPC_CPUFREQ=m
++CONFIG_ARM_SCPI_CPUFREQ=y
++CONFIG_ARM_IMX_CPUFREQ_DT=y
++CONFIG_ARM_SCMI_CPUFREQ=y
++CONFIG_QORIQ_CPUFREQ=y
++CONFIG_ACPI=y
++CONFIG_ACPI_APEI=y
++CONFIG_ACPI_APEI_GHES=y
++CONFIG_ACPI_APEI_MEMORY_FAILURE=y
++CONFIG_ACPI_APEI_EINJ=y
++CONFIG_VIRTUALIZATION=y
++CONFIG_KVM=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_KSM=y
++CONFIG_MEMORY_FAILURE=y
++CONFIG_TRANSPARENT_HUGEPAGE=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_TLS=y
++CONFIG_TLS_DEVICE=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IPV6_SIT=m
++CONFIG_NETFILTER=y
++CONFIG_BRIDGE_NETFILTER=m
++CONFIG_NETFILTER_NETLINK_OSF=m
++CONFIG_NF_CONNTRACK=m
++CONFIG_NF_CONNTRACK_EVENTS=y
++CONFIG_NF_TABLES=y
++CONFIG_NF_TABLES_INET=y
++CONFIG_NF_TABLES_NETDEV=y
++CONFIG_NFT_CT=m
++CONFIG_NFT_MASQ=m
++CONFIG_NFT_NAT=m
++CONFIG_NFT_COMPAT=m
++CONFIG_NFT_DUP_NETDEV=m
++CONFIG_NFT_FWD_NETDEV=m
++CONFIG_NF_FLOW_TABLE=m
++CONFIG_NETFILTER_XT_MARK=m
++CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
++CONFIG_NETFILTER_XT_TARGET_LOG=m
++CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
++CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
++CONFIG_NETFILTER_XT_MATCH_IPVS=m
++CONFIG_IP_VS=m
++CONFIG_NF_SOCKET_IPV4=m
++CONFIG_NF_TPROXY_IPV4=m
++CONFIG_IP_NF_IPTABLES=m
++CONFIG_IP_NF_FILTER=m
++CONFIG_IP_NF_TARGET_REJECT=m
++CONFIG_IP_NF_NAT=m
++CONFIG_IP_NF_TARGET_MASQUERADE=m
++CONFIG_IP_NF_MANGLE=m
++CONFIG_NF_SOCKET_IPV6=m
++CONFIG_NF_TPROXY_IPV6=m
++CONFIG_IP6_NF_IPTABLES=m
++CONFIG_IP6_NF_FILTER=m
++CONFIG_IP6_NF_TARGET_REJECT=m
++CONFIG_IP6_NF_MANGLE=m
++CONFIG_IP6_NF_NAT=m
++CONFIG_IP6_NF_TARGET_MASQUERADE=m
++CONFIG_NF_TABLES_BRIDGE=m
++CONFIG_BRIDGE_NF_EBTABLES=m
++CONFIG_BRIDGE=y
++CONFIG_BRIDGE_VLAN_FILTERING=y
++CONFIG_NET_DSA=m
++CONFIG_VLAN_8021Q_GVRP=y
++CONFIG_VLAN_8021Q_MVRP=y
++CONFIG_LLC2=y
++CONFIG_NET_SCHED=y
++CONFIG_NET_SCH_MULTIQ=y
++CONFIG_NET_SCH_CBS=y
++CONFIG_NET_SCH_ETF=y
++CONFIG_NET_SCH_TAPRIO=y
++CONFIG_NET_SCH_MQPRIO=y
++CONFIG_NET_SCH_INGRESS=y
++CONFIG_NET_CLS_BASIC=y
++CONFIG_NET_CLS_U32=y
++CONFIG_NET_CLS_FLOWER=y
++CONFIG_NET_CLS_ACT=y
++CONFIG_NET_ACT_GACT=m
++CONFIG_NET_ACT_MIRRED=m
++CONFIG_NET_ACT_SKBEDIT=y
++CONFIG_NET_ACT_GATE=y
++CONFIG_NET_ACT_POLICE=y
++CONFIG_TSN=y
++CONFIG_VSOCKETS=y
++CONFIG_VIRTIO_VSOCKETS=y
++CONFIG_QRTR=m
++CONFIG_QRTR_SMD=m
++CONFIG_QRTR_TUN=m
++CONFIG_NET_PKTGEN=m
++CONFIG_CAN=m
++CONFIG_BT=y
++CONFIG_BT_RFCOMM=y
++CONFIG_BT_RFCOMM_TTY=y
++CONFIG_BT_BNEP=y
++CONFIG_BT_BNEP_MC_FILTER=y
++CONFIG_BT_BNEP_PROTO_FILTER=y
++CONFIG_BT_HIDP=y
++CONFIG_BT_LEDS=y
++# CONFIG_BT_DEBUGFS is not set
++CONFIG_BT_HCIBTUSB=m
++CONFIG_BT_HCIUART=y
++CONFIG_BT_HCIUART_BCSP=y
++CONFIG_BT_HCIUART_ATH3K=y
++CONFIG_BT_HCIUART_LL=y
++CONFIG_BT_HCIUART_3WIRE=y
++CONFIG_BT_HCIUART_BCM=y
++CONFIG_BT_HCIUART_QCA=y
++CONFIG_BT_HCIVHCI=y
++CONFIG_BT_NXPUART=m
++CONFIG_CFG80211=y
++CONFIG_NL80211_TESTMODE=y
++CONFIG_CFG80211_WEXT=y
++CONFIG_MAC80211=y
++CONFIG_MAC80211_LEDS=y
++CONFIG_NET_9P=y
++CONFIG_NET_9P_VIRTIO=y
++CONFIG_NFC=m
++CONFIG_NFC_NCI=m
++CONFIG_NFC_S3FWRN5_I2C=m
++CONFIG_PCI=y
++CONFIG_PCIEPORTBUS=y
++CONFIG_PCI_IOV=y
++CONFIG_PCI_PASID=y
++CONFIG_HOTPLUG_PCI=y
++CONFIG_HOTPLUG_PCI_ACPI=y
++CONFIG_PCI_HOST_GENERIC=y
++CONFIG_PCI_XGENE=y
++CONFIG_PCIE_ALTERA=y
++CONFIG_PCIE_ALTERA_MSI=y
++CONFIG_PCI_HOST_THUNDER_PEM=y
++CONFIG_PCI_HOST_THUNDER_ECAM=y
++CONFIG_PCI_IMX6_HOST=y
++CONFIG_PCI_IMX6_EP=y
++CONFIG_PCI_LAYERSCAPE=y
++CONFIG_PCI_HISI=y
++CONFIG_PCIE_KIRIN=y
++CONFIG_PCI_MESON=m
++CONFIG_PCIE_LAYERSCAPE_GEN4=y
++CONFIG_PCI_ENDPOINT=y
++CONFIG_PCI_ENDPOINT_CONFIGFS=y
++CONFIG_PCI_EPF_TEST=y
++CONFIG_PCI_NXP_RPMSG=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_FW_LOADER_USER_HELPER=y
++CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y
++CONFIG_BRCMSTB_GISB_ARB=y
++CONFIG_VEXPRESS_CONFIG=y
++CONFIG_FSL_MC_UAPI_SUPPORT=y
++CONFIG_ARM_SCMI_PROTOCOL=y
++CONFIG_ARM_SCMI_POWER_CONTROL=y
++CONFIG_IMX_SCMI_BBM_CONTROL=y
++CONFIG_IMX_SCMI_MISC_CONTROL=y
++CONFIG_ARM_SCPI_PROTOCOL=y
++CONFIG_EFI_CAPSULE_LOADER=y
++CONFIG_IMX_DSP=y
++CONFIG_IMX_SEC_ENCLAVE=y
++CONFIG_IMX_SCU=y
++CONFIG_IMX_SCU_PD=y
++CONFIG_GNSS=m
++CONFIG_GNSS_MTK_SERIAL=m
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_DATAFLASH=y
++CONFIG_MTD_SST25L=y
++CONFIG_MTD_RAW_NAND=y
++CONFIG_MTD_NAND_DENALI_DT=y
++CONFIG_MTD_NAND_GPMI_NAND=y
++CONFIG_MTD_NAND_FSL_IFC=y
++CONFIG_MTD_SPI_NAND=y
++CONFIG_MTD_SPI_NOR=y
++# CONFIG_MTD_SPI_NOR_USE_4K_SECTORS is not set
++CONFIG_MTD_UBI=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_NBD=m
++CONFIG_XEN_BLKDEV_BACKEND=m
++CONFIG_VIRTIO_BLK=y
++CONFIG_BLK_DEV_NVME=y
++CONFIG_SRAM=y
++CONFIG_PCI_ENDPOINT_TEST=y
++CONFIG_EEPROM_AT24=m
++CONFIG_EEPROM_AT25=m
++CONFIG_UACCE=m
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++CONFIG_SCSI_SAS_ATA=y
++CONFIG_SCSI_HISI_SAS=y
++CONFIG_SCSI_HISI_SAS_PCI=y
++CONFIG_MEGARAID_SAS=y
++CONFIG_SCSI_MPT3SAS=m
++CONFIG_ATA=y
++CONFIG_SATA_AHCI=y
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_AHCI_IMX=y
++CONFIG_AHCI_CEVA=y
++CONFIG_AHCI_XGENE=y
++CONFIG_AHCI_QORIQ=y
++CONFIG_SATA_SIL24=y
++CONFIG_PATA_OF_PLATFORM=y
++CONFIG_MD=y
++CONFIG_BLK_DEV_MD=m
++CONFIG_BLK_DEV_DM=m
++CONFIG_DM_CRYPT=m
++CONFIG_DM_MIRROR=m
++CONFIG_DM_ZERO=m
++CONFIG_NETDEVICES=y
++CONFIG_MACVLAN=m
++CONFIG_MACVTAP=m
++CONFIG_TUN=y
++CONFIG_VETH=m
++CONFIG_VIRTIO_NET=y
++CONFIG_NET_DSA_MSCC_FELIX=m
++CONFIG_NET_DSA_SJA1105=m
++CONFIG_NET_DSA_SJA1105_PTP=y
++CONFIG_NET_DSA_SJA1105_TAS=y
++CONFIG_NET_DSA_SJA1105_VL=y
++CONFIG_AMD_XGBE=y
++CONFIG_ATL1C=m
++CONFIG_BCMGENET=m
++CONFIG_BNX2X=m
++CONFIG_SYSTEMPORT=m
++CONFIG_MACB=y
++CONFIG_THUNDER_NIC_PF=y
++CONFIG_FEC=y
++CONFIG_FEC_UIO=y
++CONFIG_FSL_FMAN=y
++CONFIG_FSL_DPAA_ETH=y
++CONFIG_FSL_DPAA2_ETH=y
++CONFIG_FSL_DPAA2_MAC=y
++CONFIG_FSL_DPAA2_SWITCH=y
++CONFIG_FSL_ENETC=y
++CONFIG_FSL_ENETC_VF=y
++CONFIG_FSL_ENETC_QOS=y
++CONFIG_FSL_ENETC4=y
++CONFIG_NXP_NETC_BLK_CTRL=y
++CONFIG_FSL_ENETC_MDIO=y
++CONFIG_HIX5HD2_GMAC=y
++CONFIG_HNS_DSAF=y
++CONFIG_HNS_ENET=y
++CONFIG_HNS3=y
++CONFIG_HNS3_HCLGE=y
++CONFIG_HNS3_ENET=y
++CONFIG_E1000=y
++CONFIG_E1000E=y
++CONFIG_IGB=y
++CONFIG_IGBVF=y
++CONFIG_MVMDIO=y
++CONFIG_SKY2=y
++CONFIG_MLX4_EN=m
++CONFIG_MLX5_CORE=m
++CONFIG_MLX5_CORE_EN=y
++CONFIG_MSCC_OCELOT_SWITCH=y
++CONFIG_QCOM_EMAC=m
++CONFIG_RMNET=m
++CONFIG_SMC91X=y
++CONFIG_SMSC911X=y
++CONFIG_STMMAC_ETH=y
++CONFIG_DWMAC_GENERIC=m
++CONFIG_AQUANTIA_PHY=y
++CONFIG_BROADCOM_PHY=m
++CONFIG_BCM54140_PHY=m
++CONFIG_INPHI_PHY=y
++CONFIG_MARVELL_PHY=m
++CONFIG_MARVELL_10G_PHY=m
++CONFIG_MICREL_PHY=y
++CONFIG_MICROSEMI_PHY=y
++CONFIG_NXP_C45_TJA11XX_PHY=y
++CONFIG_NXP_TJA11XX_PHY=y
++CONFIG_AT803X_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_ROCKCHIP_PHY=y
++CONFIG_VITESSE_PHY=y
++CONFIG_CAN_FLEXCAN=m
++CONFIG_MDIO_BITBANG=y
++CONFIG_MDIO_BUS_MUX_MULTIPLEXER=y
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_USB_PEGASUS=m
++CONFIG_USB_RTL8150=m
++CONFIG_USB_RTL8152=y
++CONFIG_USB_LAN78XX=m
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_AX8817X=m
++CONFIG_USB_NET_AX88179_178A=m
++CONFIG_USB_NET_CDCETHER=m
++CONFIG_USB_NET_CDC_NCM=m
++CONFIG_USB_NET_DM9601=m
++CONFIG_USB_NET_SR9800=m
++CONFIG_USB_NET_SMSC75XX=m
++CONFIG_USB_NET_SMSC95XX=m
++CONFIG_USB_NET_NET1080=m
++CONFIG_USB_NET_PLUSB=m
++CONFIG_USB_NET_MCS7830=m
++CONFIG_USB_NET_CDC_SUBSET=m
++CONFIG_USB_NET_ZAURUS=m
++CONFIG_HOSTAP=y
++CONFIG_WL18XX=m
++CONFIG_WLCORE_SDIO=m
++CONFIG_XEN_NETDEV_BACKEND=m
++CONFIG_IVSHMEM_NET=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_KEYBOARD_ADC=m
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_RPMSG=y
++CONFIG_KEYBOARD_SNVS_PWRKEY=y
++CONFIG_INPUT_BBNSM_PWRKEY=y
++CONFIG_KEYBOARD_IMX_SC_KEY=y
++CONFIG_KEYBOARD_CROS_EC=y
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_ATMEL_MXT=m
++CONFIG_TOUCHSCREEN_EXC3000=y
++CONFIG_TOUCHSCREEN_GOODIX=m
++CONFIG_TOUCHSCREEN_ILITEK=y
++CONFIG_TOUCHSCREEN_EDT_FT5X06=m
++CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_I2C=m
++CONFIG_TOUCHSCREEN_FTS=m
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_PWM_BEEPER=m
++CONFIG_INPUT_PWM_VIBRA=m
++# CONFIG_SERIO_SERPORT is not set
++CONFIG_SERIO_AMBAKMI=y
++CONFIG_LEGACY_PTY_COUNT=16
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_IMX=y
++CONFIG_SERIAL_IMX_CONSOLE=y
++CONFIG_SERIAL_XILINX_PS_UART=y
++CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_SERIAL_FSL_LINFLEXUART=y
++CONFIG_SERIAL_FSL_LINFLEXUART_CONSOLE=y
++CONFIG_SERIAL_DEV_BUS=y
++CONFIG_VIRTIO_CONSOLE=y
++CONFIG_IPMI_HANDLER=m
++CONFIG_IPMI_DEVICE_INTERFACE=m
++CONFIG_IPMI_SI=m
++CONFIG_TCG_TPM=y
++CONFIG_TCG_TIS_I2C_INFINEON=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
++CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_MUX_GPIO=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_GPIO=m
++CONFIG_I2C_IMX=y
++CONFIG_I2C_IMX_LPI2C=y
++CONFIG_I2C_IMX_FLEXIO=y
++CONFIG_I2C_RK3X=y
++CONFIG_I2C_RPBUS=y
++CONFIG_I2C_CROS_EC_TUNNEL=y
++CONFIG_I2C_SLAVE_EEPROM=y
++CONFIG_I3C=y
++CONFIG_SVC_I3C_MASTER=y
++CONFIG_SPI=y
++CONFIG_SPI_CADENCE_QUADSPI=y
++CONFIG_SPI_DESIGNWARE=m
++CONFIG_SPI_DW_DMA=y
++CONFIG_SPI_DW_MMIO=m
++CONFIG_SPI_FSL_LPSPI=y
++CONFIG_SPI_FSL_QUADSPI=y
++CONFIG_SPI_NXP_FLEXSPI=y
++CONFIG_SPI_IMX=y
++CONFIG_SPI_FSL_DSPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_ROCKCHIP=y
++CONFIG_SPI_SPIDEV=y
++CONFIG_SPI_SLAVE=y
++CONFIG_SPI_SLAVE_TIME=y
++CONFIG_SPI_SLAVE_SYSTEM_CONTROL=y
++CONFIG_SPMI=y
++CONFIG_PPS_CLIENT_GPIO=y
++CONFIG_PINCTRL_MAX77620=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_PINCTRL_SCMI=y
++CONFIG_PINCTRL_IMX_SCMI=y
++CONFIG_PINCTRL_IMX8MM=y
++CONFIG_PINCTRL_IMX8MN=y
++CONFIG_PINCTRL_IMX8MP=y
++CONFIG_PINCTRL_IMX8MQ=y
++CONFIG_PINCTRL_IMX8QM=y
++CONFIG_PINCTRL_IMX8QXP=y
++CONFIG_PINCTRL_IMX8DXL=y
++CONFIG_PINCTRL_IMX8ULP=y
++CONFIG_PINCTRL_IMX93=y
++CONFIG_PINCTRL_S32V234=y
++CONFIG_GPIO_ALTERA=m
++CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_IMX_RPMSG=y
++CONFIG_GPIO_MB86S7X=y
++CONFIG_GPIO_MPC8XXX=y
++CONFIG_GPIO_MXC=y
++CONFIG_GPIO_PL061=y
++CONFIG_GPIO_WCD934X=m
++CONFIG_GPIO_XGENE=y
++CONFIG_GPIO_MAX732X=y
++CONFIG_GPIO_PCA953X=y
++CONFIG_GPIO_PCA953X_IRQ=y
++CONFIG_GPIO_ADP5585=y
++CONFIG_GPIO_BD9571MWV=m
++CONFIG_GPIO_MAX77620=y
++CONFIG_GPIO_SL28CPLD=m
++CONFIG_POWER_RESET_BRCMSTB=y
++CONFIG_POWER_RESET_XGENE=y
++CONFIG_POWER_RESET_SYSCON=y
++CONFIG_SYSCON_REBOOT_MODE=y
++CONFIG_BATTERY_SBS=m
++CONFIG_BATTERY_BQ27XXX=y
++CONFIG_BATTERY_MAX17042=m
++CONFIG_CHARGER_BQ25890=m
++CONFIG_CHARGER_BQ25980=m
++CONFIG_SENSORS_ARM_SCMI=y
++CONFIG_SENSORS_ARM_SCPI=y
++CONFIG_SENSORS_FP9931=y
++CONFIG_SENSORS_LM90=m
++CONFIG_SENSORS_PWM_FAN=m
++CONFIG_SENSORS_SL28CPLD=m
++CONFIG_SENSORS_INA2XX=m
++CONFIG_SENSORS_INA3221=m
++CONFIG_THERMAL_WRITABLE_TRIPS=y
++CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
++CONFIG_CPU_THERMAL=y
++CONFIG_DEVFREQ_THERMAL=y
++CONFIG_THERMAL_EMULATION=y
++CONFIG_IMX_SC_THERMAL=y
++CONFIG_IMX8MM_THERMAL=y
++CONFIG_IMX91_THERMAL=y
++CONFIG_QORIQ_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_SL28CPLD_WATCHDOG=m
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_ARM_SBSA_WATCHDOG=y
++CONFIG_DW_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_IMX_SC_WDT=y
++CONFIG_IMX7ULP_WDT=y
++CONFIG_ARM_SMC_WATCHDOG=y
++CONFIG_XEN_WDT=y
++CONFIG_MFD_ADP5585=y
++CONFIG_MFD_BD9571MWV=y
++CONFIG_MFD_AXP20X_I2C=y
++CONFIG_MFD_IMX_FLEXIO=y
++CONFIG_MFD_HI6421_PMIC=y
++CONFIG_MFD_FP9931=y
++CONFIG_MFD_MAX77620=y
++CONFIG_MFD_MAXIM_SERDES=y
++CONFIG_MFD_MAX96752=y
++CONFIG_MFD_MAX96752_I2C=y
++CONFIG_MFD_MAX96789=y
++CONFIG_MFD_MAX96789_I2C=y
++CONFIG_MFD_MT6397=y
++CONFIG_MFD_RK808=y
++CONFIG_MFD_SEC_CORE=y
++CONFIG_MFD_SL28CPLD=y
++CONFIG_MFD_ROHM_BD718XX=y
++CONFIG_MFD_WCD934X=m
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_AXP20X=y
++CONFIG_REGULATOR_BD718XX=y
++CONFIG_REGULATOR_BD9571MWV=y
++CONFIG_REGULATOR_FAN53555=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_HI6421V530=y
++CONFIG_REGULATOR_MAX77620=y
++CONFIG_REGULATOR_MAX8973=y
++CONFIG_REGULATOR_FP9931=y
++CONFIG_REGULATOR_MP8859=y
++CONFIG_REGULATOR_MT6358=y
++CONFIG_REGULATOR_MT6397=y
++CONFIG_REGULATOR_PCA9450=y
++CONFIG_REGULATOR_PF9453=y
++CONFIG_REGULATOR_PF0900=y
++CONFIG_REGULATOR_PF8X00=y
++CONFIG_REGULATOR_PFUZE100=y
++CONFIG_REGULATOR_PWM=y
++CONFIG_REGULATOR_QCOM_SPMI=y
++CONFIG_REGULATOR_RK808=y
++CONFIG_REGULATOR_S2MPS11=y
++CONFIG_REGULATOR_TPS65132=m
++CONFIG_REGULATOR_VCTRL=m
++CONFIG_RC_CORE=m
++CONFIG_RC_DECODERS=y
++CONFIG_IR_IMON_DECODER=m
++CONFIG_IR_JVC_DECODER=m
++CONFIG_IR_MCE_KBD_DECODER=m
++CONFIG_IR_NEC_DECODER=m
++CONFIG_IR_RC5_DECODER=m
++CONFIG_IR_RC6_DECODER=m
++CONFIG_IR_RCMM_DECODER=m
++CONFIG_IR_SANYO_DECODER=m
++CONFIG_IR_SHARP_DECODER=m
++CONFIG_IR_SONY_DECODER=m
++CONFIG_IR_XMP_DECODER=m
++CONFIG_RC_DEVICES=y
++CONFIG_IR_GPIO_CIR=m
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
++CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
++CONFIG_MEDIA_SDR_SUPPORT=y
++CONFIG_MEDIA_PLATFORM_SUPPORT=y
++# CONFIG_DVB_NET is not set
++CONFIG_MEDIA_USB_SUPPORT=y
++CONFIG_USB_VIDEO_CLASS=m
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SDR_PLATFORM_DRIVERS=y
++CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_MXC_CAPTURE=y
++CONFIG_MXC_MIPI_CSI=y
++CONFIG_VIDEO_IMX_MIPI_CSIS=m
++CONFIG_VIDEO_IMX8MQ_MIPI_CSI2=m
++CONFIG_VIDEO_IMX7_CSI=m
++CONFIG_MXC_CAMERA_OV5640_MIPI_V2=y
++CONFIG_VIDEO_AMPHION_VPU=y
++CONFIG_VIDEO_IMX_CSI_FORMATTER=y
++CONFIG_VIDEO_DWC_MIPI_CSIS=y
++CONFIG_VIDEO_IMX_PARALLEL_CSI=y
++CONFIG_VIDEO_IMX8_ISI=y
++CONFIG_VIDEO_IMX8_ISI_M2M=y
++CONFIG_VIDEO_IMX8_JPEG=m
++CONFIG_MXC_VIDEO_WAVE6=y
++CONFIG_VIDEO_NXP_NEOISP=m
++CONFIG_VIDEO_HANTRO=m
++CONFIG_VIDEO_IMX219=m
++CONFIG_VIDEO_OV5640=y
++CONFIG_VIDEO_OV5645=m
++CONFIG_VIDEO_AP1302=m
++CONFIG_VIDEO_OX03C10_DRV=m
++CONFIG_VIDEO_OX05B1S=m
++CONFIG_VIDEO_MT9M114X=y
++CONFIG_VIDEO_MAX96724=m
++CONFIG_VIDEO_MX95MBCAM=m
++CONFIG_VIDEO_DS90UB953=m
++CONFIG_VIDEO_DS90UB960=m
++CONFIG_IMX_DPU_CORE=y
++CONFIG_IMX8MM_LCDIF_CORE=y
++CONFIG_IMX_LCDIFV3_CORE=y
++CONFIG_DRM=y
++CONFIG_DRM_I2C_NXP_TDA998X=m
++CONFIG_DRM_MALI_DISPLAY=m
++CONFIG_DRM_NOUVEAU=m
++CONFIG_DRM_RCAR_DW_HDMI=m
++CONFIG_DRM_VIRTIO_GPU=y
++CONFIG_DRM_PANEL_BOE_TV101WUM_NL6=m
++CONFIG_DRM_PANEL_LVDS=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_PANEL_MANTIX_MLAF057WE51=m
++CONFIG_DRM_PANEL_RAYDIUM_RM67191=y
++CONFIG_DRM_PANEL_RAYDIUM_RM68200=y
++CONFIG_DRM_PANEL_RAYDIUM_RM692C9=y
++CONFIG_DRM_PANEL_ROCKTECK_HIMAX8394F=y
++CONFIG_DRM_PANEL_SEIKO_43WVF1G=y
++CONFIG_DRM_PANEL_SITRONIX_ST7703=m
++CONFIG_DRM_PANEL_TIANMA_TM050RDH03=y
++CONFIG_DRM_PANEL_TRULY_NT35597_WQXGA=m
++CONFIG_DRM_PANEL_WKS_101WX001=y
++CONFIG_DRM_DISPLAY_CONNECTOR=y
++CONFIG_DRM_LONTIUM_LT8912B=m
++CONFIG_DRM_LONTIUM_LT9611=m
++CONFIG_DRM_LONTIUM_LT9611UXC=y
++CONFIG_DRM_FSL_IMX_LVDS_BRIDGE=y
++CONFIG_DRM_MAX96752_LVDS=y
++CONFIG_DRM_MAX96789_DSI=y
++CONFIG_DRM_NWL_MIPI_DSI=y
++CONFIG_DRM_NXP_SEIKO_43WVFIG=y
++CONFIG_DRM_PARADE_PS8640=m
++CONFIG_DRM_SII902X=m
++CONFIG_DRM_SIMPLE_BRIDGE=m
++CONFIG_DRM_THINE_THC63LVD1024=m
++CONFIG_DRM_TI_SN65DSI83=y
++CONFIG_DRM_TI_SN65DSI86=m
++CONFIG_DRM_I2C_ADV7511=y
++CONFIG_DRM_I2C_ADV7511_AUDIO=y
++CONFIG_DRM_IMX95_LDB=y
++CONFIG_DRM_IMX95_MIPI_DSI=y
++CONFIG_DRM_IMX95_PIXEL_INTERLEAVER=y
++CONFIG_DRM_IMX95_PIXEL_LINK=y
++CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
++CONFIG_DRM_DW_HDMI_I2S_AUDIO=m
++CONFIG_DRM_DW_HDMI_GP_AUDIO=y
++CONFIG_DRM_DW_HDMI_CEC=m
++CONFIG_DRM_ITE_IT6263=y
++CONFIG_DRM_ITE_IT6161=y
++CONFIG_DRM_IMX=y
++CONFIG_DRM_IMX_LCDIF_MUX_DISPLAY=y
++CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
++CONFIG_DRM_IMX_TVE=y
++CONFIG_DRM_IMX_LDB=y
++CONFIG_DRM_IMX8QM_LDB=y
++CONFIG_DRM_IMX8QXP_LDB=y
++CONFIG_DRM_IMX8MP_LDB=y
++CONFIG_DRM_IMX93_LDB=y
++CONFIG_DRM_IMX_DW_MIPI_DSI=y
++CONFIG_DRM_IMX93_PARALLEL_DISPLAY_FORMAT=y
++CONFIG_DRM_IMX_HDMI=y
++CONFIG_DRM_IMX_SEC_DSIM=y
++CONFIG_DRM_IMX_DCNANO=y
++CONFIG_DRM_IMX95_DPU=y
++CONFIG_DRM_IMX_DCSS=y
++CONFIG_DRM_IMX_CDNS_MHDP=y
++CONFIG_DRM_ETNAVIV=m
++CONFIG_DRM_HISI_HIBMC=m
++CONFIG_DRM_HISI_KIRIN=m
++CONFIG_DRM_MXSFB=y
++CONFIG_DRM_PL111=m
++CONFIG_DRM_XEN_FRONTEND=y
++CONFIG_DRM_LIMA=m
++CONFIG_DRM_PANFROST=m
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FB_EFI=y
++CONFIG_FB_MXC_EINK_V2_PANEL=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_GPIO=y
++CONFIG_BACKLIGHT_PWM=y
++CONFIG_BACKLIGHT_LP855X=m
++CONFIG_BACKLIGHT_LED=y
++CONFIG_LOGO=y
++# CONFIG_LOGO_LINUX_MONO is not set
++# CONFIG_LOGO_LINUX_VGA16 is not set
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_ALOOP=m
++CONFIG_SND_USB_AUDIO=m
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_FSL_ASRC=m
++CONFIG_SND_SOC_FSL_MQS=m
++CONFIG_SND_SOC_FSL_MICFIL=m
++CONFIG_SND_SOC_FSL_EASRC=m
++CONFIG_SND_SOC_FSL_XCVR=m
++CONFIG_SND_SOC_FSL_ESAI_CLIENT=y
++CONFIG_SND_SOC_FSL_RPMSG=m
++CONFIG_SND_IMX_SOC=m
++CONFIG_SND_SOC_IMX_SGTL5000=m
++CONFIG_SND_SOC_IMX_SPDIF=m
++CONFIG_SND_SOC_FSL_ASOC_CARD=m
++CONFIG_SND_SOC_IMX_AUDMIX=m
++CONFIG_SND_SOC_IMX_HDMI=m
++CONFIG_SND_SOC_IMX_CARD=m
++CONFIG_SND_SOC_IMX_PCM512X=m
++CONFIG_SND_SOC_SOF_TOPLEVEL=y
++CONFIG_SND_SOC_SOF_OF=m
++CONFIG_SND_SOC_SOF_IMX_TOPLEVEL=y
++CONFIG_SND_SOC_SOF_IMX8=m
++CONFIG_SND_SOC_SOF_IMX8M=m
++CONFIG_SND_SOC_SOF_IMX8ULP=m
++CONFIG_SND_SOC_SOF_IMX95=m
++CONFIG_SND_SOC_AK4613=m
++CONFIG_SND_SOC_BT_SCO=y
++CONFIG_SND_SOC_CROS_EC_CODEC=m
++CONFIG_SND_SOC_CS42XX8_I2C=y
++CONFIG_SND_SOC_DMIC=m
++CONFIG_SND_SOC_ES7134=m
++CONFIG_SND_SOC_ES7241=m
++CONFIG_SND_SOC_GTM601=m
++CONFIG_SND_SOC_MAX98357A=m
++CONFIG_SND_SOC_MAX98927=m
++CONFIG_SND_SOC_MSM8916_WCD_ANALOG=m
++CONFIG_SND_SOC_MSM8916_WCD_DIGITAL=m
++CONFIG_SND_SOC_PCM3168A_I2C=m
++CONFIG_SND_SOC_RT5659=m
++CONFIG_SND_SOC_SIMPLE_AMPLIFIER=m
++CONFIG_SND_SOC_SIMPLE_MUX=m
++CONFIG_SND_SOC_SPDIF=m
++CONFIG_SND_SOC_TAS571X=m
++CONFIG_SND_SOC_WCD934X=m
++CONFIG_SND_SOC_WM8524=y
++CONFIG_SND_SOC_WM8904=m
++CONFIG_SND_SOC_WM8960=m
++CONFIG_SND_SOC_WM8962=m
++CONFIG_SND_SOC_WSA881X=m
++CONFIG_SND_SOC_RPMSG_WM8960=m
++CONFIG_SND_SOC_RPMSG_AK4497=m
++CONFIG_SND_SOC_LPASS_WSA_MACRO=m
++CONFIG_SND_SOC_LPASS_VA_MACRO=m
++CONFIG_SND_SIMPLE_CARD=y
++CONFIG_SND_AUDIO_GRAPH_CARD=y
++CONFIG_SND_AUDIO_GRAPH_CARD2=m
++CONFIG_SND_VIRTIO=y
++CONFIG_HID_MULTITOUCH=m
++CONFIG_I2C_HID_ACPI=m
++CONFIG_I2C_HID_OF=m
++CONFIG_USB_CONN_GPIO=y
++CONFIG_USB=y
++CONFIG_USB_OTG=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_PCI_RENESAS=m
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_HCD_TEST_MODE=y
++CONFIG_USB_XEN_HCD=y
++CONFIG_USB_ACM=m
++CONFIG_USB_STORAGE=y
++CONFIG_USB_UAS=y
++CONFIG_USB_CDNS_SUPPORT=y
++CONFIG_USB_CDNS3=y
++CONFIG_USB_CDNS3_GADGET=y
++CONFIG_USB_CDNS3_HOST=y
++CONFIG_USB_MUSB_HDRC=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC2=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_UDC=y
++CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_ISP1760=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_CONSOLE=y
++CONFIG_USB_SERIAL_GENERIC=y
++CONFIG_USB_SERIAL_SIMPLE=y
++CONFIG_USB_SERIAL_CP210X=m
++CONFIG_USB_SERIAL_FTDI_SIO=y
++CONFIG_USB_SERIAL_OPTION=m
++CONFIG_USB_TEST=m
++CONFIG_USB_EHSET_TEST_FIXTURE=y
++CONFIG_USB_HSIC_USB3503=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_USB_MXS_PHY=y
++CONFIG_USB_ULPI=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_SNP_UDC_PLAT=y
++CONFIG_USB_BDC_UDC=y
++CONFIG_USB_CONFIGFS=y
++CONFIG_USB_CONFIGFS_SERIAL=y
++CONFIG_USB_CONFIGFS_ACM=y
++CONFIG_USB_CONFIGFS_OBEX=y
++CONFIG_USB_CONFIGFS_NCM=y
++CONFIG_USB_CONFIGFS_ECM=y
++CONFIG_USB_CONFIGFS_ECM_SUBSET=y
++CONFIG_USB_CONFIGFS_RNDIS=y
++CONFIG_USB_CONFIGFS_EEM=y
++CONFIG_USB_CONFIGFS_MASS_STORAGE=y
++CONFIG_USB_CONFIGFS_F_LB_SS=y
++CONFIG_USB_CONFIGFS_F_FS=y
++CONFIG_USB_CONFIGFS_F_UAC1=y
++CONFIG_USB_CONFIGFS_F_UAC1_LEGACY=y
++CONFIG_USB_CONFIGFS_F_UAC2=y
++CONFIG_USB_CONFIGFS_F_MIDI=y
++CONFIG_USB_CONFIGFS_F_HID=y
++CONFIG_USB_CONFIGFS_F_UVC=y
++CONFIG_USB_ZERO=m
++CONFIG_USB_AUDIO=m
++CONFIG_USB_ETH=m
++CONFIG_USB_MASS_STORAGE=m
++CONFIG_USB_G_SERIAL=m
++CONFIG_TYPEC=y
++CONFIG_TYPEC_TCPM=y
++CONFIG_TYPEC_TCPCI=y
++CONFIG_TYPEC_FUSB302=m
++CONFIG_TYPEC_TPS6598X=m
++CONFIG_TYPEC_HD3SS3220=m
++CONFIG_TYPEC_SWITCH_GPIO=y
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=32
++CONFIG_MMC_ARMMMCI=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_ACPI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_ARASAN=y
++CONFIG_MMC_SDHCI_OF_ESDHC=y
++CONFIG_MMC_SDHCI_CADENCE=y
++CONFIG_MMC_SDHCI_ESDHC_IMX=y
++CONFIG_MMC_SDHCI_F_SDH30=y
++CONFIG_MMC_SPI=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_EXYNOS=y
++CONFIG_MMC_DW_HI3798CV200=y
++CONFIG_MMC_DW_K3=y
++CONFIG_MMC_MTK=y
++CONFIG_MMC_SDHCI_XENON=y
++CONFIG_MMC_SDHCI_AM654=y
++CONFIG_SCSI_UFSHCD=y
++CONFIG_SCSI_UFSHCD_PLATFORM=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_CLASS_MULTICOLOR=m
++CONFIG_LEDS_LM3692X=m
++CONFIG_LEDS_PCA9532=m
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_PCA963X=y
++CONFIG_LEDS_PCA995X=m
++CONFIG_LEDS_PWM=y
++CONFIG_LEDS_SYSCON=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_DISK=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_CPU=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_LEDS_TRIGGER_PANIC=y
++CONFIG_EDAC=y
++CONFIG_EDAC_GHES=y
++CONFIG_EDAC_LAYERSCAPE=m
++CONFIG_EDAC_SYNOPSYS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS1307=m
++CONFIG_RTC_DRV_HYM8563=m
++CONFIG_RTC_DRV_MAX77686=y
++CONFIG_RTC_DRV_RK808=m
++CONFIG_RTC_DRV_PCF85363=m
++CONFIG_RTC_DRV_M41T80=m
++CONFIG_RTC_DRV_RX8581=m
++CONFIG_RTC_DRV_RV3028=m
++CONFIG_RTC_DRV_RV8803=m
++CONFIG_RTC_DRV_S5M=y
++CONFIG_RTC_DRV_DS3232=y
++CONFIG_RTC_DRV_PCF2127=m
++CONFIG_RTC_DRV_EFI=y
++CONFIG_RTC_DRV_CROS_EC=y
++CONFIG_RTC_DRV_FSL_FTM_ALARM=m
++CONFIG_RTC_DRV_PL031=y
++CONFIG_RTC_DRV_SNVS=y
++CONFIG_RTC_DRV_BBNSM=y
++CONFIG_RTC_DRV_IMX_SC=y
++CONFIG_RTC_DRV_IMX_SM=y
++CONFIG_RTC_DRV_IMX_RPMSG=y
++CONFIG_DMADEVICES=y
++CONFIG_BCM_SBA_RAID=m
++CONFIG_FSL_EDMA=y
++CONFIG_FSL_QDMA=m
++CONFIG_FSL_EDMA_V3=y
++CONFIG_IMX_SDMA=y
++CONFIG_MV_XOR_V2=y
++CONFIG_MXS_DMA=y
++CONFIG_MXC_PXP_V3=y
++CONFIG_PL330_DMA=y
++CONFIG_QCOM_HIDMA_MGMT=y
++CONFIG_QCOM_HIDMA=y
++CONFIG_DW_EDMA=y
++CONFIG_DW_EDMA_PCIE=y
++CONFIG_FSL_DPAA2_QDMA=m
++CONFIG_DMATEST=y
++CONFIG_UDMABUF=y
++CONFIG_DMABUF_HEAPS=y
++CONFIG_DMABUF_HEAPS_SYSTEM=y
++CONFIG_DMABUF_HEAPS_CMA=y
++CONFIG_DMABUF_HEAPS_DSP=y
++CONFIG_UIO_PCI_GENERIC=y
++CONFIG_UIO_IVSHMEM=y
++CONFIG_VFIO=y
++CONFIG_VFIO_PCI=y
++CONFIG_VFIO_FSL_MC=y
++CONFIG_VIRTIO_PCI=y
++CONFIG_VIRTIO_BALLOON=y
++CONFIG_VIRTIO_INPUT=y
++CONFIG_VIRTIO_MMIO=y
++CONFIG_VIRTIO_IVSHMEM=y
++CONFIG_VHOST_VSOCK=y
++CONFIG_XEN_GNTDEV=y
++CONFIG_XEN_GNTDEV_DMABUF=y
++CONFIG_XEN_GRANT_DEV_ALLOC=y
++CONFIG_XEN_GRANT_DMA_ALLOC=y
++CONFIG_XEN_PCIDEV_STUB=y
++CONFIG_XEN_PRIVCMD_IRQFD=y
++CONFIG_XEN_VIRTIO=y
++CONFIG_XEN_VIRTIO_FORCE_GRANT=y
++CONFIG_STAGING=y
++CONFIG_STAGING_MEDIA=y
++CONFIG_VIDEO_IMX_CAPTURE=y
++CONFIG_IMX8_MEDIA_DEVICE=m
++CONFIG_MHDP_HDMIRX=y
++CONFIG_MHDP_HDMIRX_CEC=y
++CONFIG_FSL_DPAA2=y
++CONFIG_FSL_PPFE=y
++CONFIG_FSL_PPFE_UTIL_DISABLED=y
++CONFIG_ETHOSU=y
++CONFIG_NEUTRON=y
++CONFIG_CHROME_PLATFORMS=y
++CONFIG_CROS_EC=y
++CONFIG_CROS_EC_I2C=y
++CONFIG_CROS_EC_SPI=y
++CONFIG_CROS_EC_CHARDEV=m
++CONFIG_CLK_VEXPRESS_OSC=y
++CONFIG_COMMON_CLK_RK808=y
++CONFIG_COMMON_CLK_SCMI=y
++CONFIG_COMMON_CLK_SCPI=y
++CONFIG_COMMON_CLK_CS2000_CP=y
++CONFIG_COMMON_CLK_FSL_SAI=y
++CONFIG_COMMON_CLK_S2MPS11=y
++CONFIG_COMMON_CLK_XGENE=y
++CONFIG_COMMON_CLK_PWM=y
++CONFIG_COMMON_CLK_VC5=y
++CONFIG_CLK_IMX8MM=y
++CONFIG_CLK_IMX8MN=y
++CONFIG_CLK_IMX8MP=y
++CONFIG_CLK_IMX8MQ=y
++CONFIG_CLK_IMX8QXP=y
++CONFIG_CLK_IMX8ULP=y
++CONFIG_CLK_IMX91=y
++CONFIG_CLK_IMX93=y
++CONFIG_CLK_IMX95_BLK_CTL=y
++CONFIG_HWSPINLOCK=y
++CONFIG_ARM_MHU=y
++CONFIG_IMX_MBOX=y
++CONFIG_PLATFORM_MHU=y
++CONFIG_IOMMU_IO_PGTABLE_ARMV7S=y
++CONFIG_ARM_SMMU=y
++CONFIG_ARM_SMMU_V3=y
++CONFIG_REMOTEPROC=y
++CONFIG_IMX_REMOTEPROC=y
++CONFIG_IMX_DSP_REMOTEPROC=m
++CONFIG_IMX_NEUTRON_REMOTEPROC=y
++CONFIG_SAMPLES=y
++CONFIG_SAMPLE_RPMSG_CLIENT=m
++CONFIG_RPMSG_TTY=m
++CONFIG_RPMSG_CHAR=m
++CONFIG_RPMSG_CTRL=m
++CONFIG_RPMSG_QCOM_GLINK_RPM=y
++CONFIG_SOUNDWIRE=m
++CONFIG_SOUNDWIRE_QCOM=m
++CONFIG_SOC_BRCMSTB=y
++CONFIG_FSL_DPAA=y
++CONFIG_FSL_MC_DPIO=y
++CONFIG_FSL_RCPM=y
++CONFIG_FSL_QIXIS=y
++CONFIG_SOC_TI=y
++CONFIG_DEVFREQ_GOV_PERFORMANCE=y
++CONFIG_DEVFREQ_GOV_POWERSAVE=y
++CONFIG_DEVFREQ_GOV_USERSPACE=y
++CONFIG_DEVFREQ_GOV_PASSIVE=y
++CONFIG_EXTCON_PTN5150=m
++CONFIG_EXTCON_USB_GPIO=y
++CONFIG_EXTCON_USBC_CROS_EC=y
++CONFIG_IIO=y
++CONFIG_FXLS8962AF_I2C=m
++CONFIG_VCNL4035=m
++CONFIG_IMX8QXP_ADC=y
++CONFIG_IMX93_ADC=y
++CONFIG_MAX9611=m
++CONFIG_QCOM_SPMI_VADC=m
++CONFIG_QCOM_SPMI_ADC5=m
++CONFIG_IIO_CROS_EC_SENSORS_CORE=m
++CONFIG_IIO_CROS_EC_SENSORS=m
++CONFIG_FXAS21002C=y
++CONFIG_FXOS8700_I2C=y
++CONFIG_RPMSG_IIO_PEDOMETER=m
++CONFIG_IIO_ST_LSM6DSX=y
++CONFIG_IIO_ST_ACCEL_3AXIS=m
++CONFIG_IIO_ST_ACCEL_I2C_3AXIS=m
++CONFIG_IIO_ST_GYRO_I2C_3AXIS=m
++CONFIG_IIO_ST_GYRO_3AXIS=m
++CONFIG_IIO_CROS_EC_LIGHT_PROX=m
++CONFIG_SENSORS_ISL29018=y
++CONFIG_VCNL4000=m
++CONFIG_IIO_ST_MAGN_3AXIS=m
++CONFIG_IIO_CROS_EC_BARO=m
++CONFIG_MPL3115=y
++CONFIG_MS5611=m
++CONFIG_MS5611_I2C=m
++CONFIG_INV_MPU6050_IIO=m
++CONFIG_INV_MPU6050_I2C=m
++CONFIG_IIO_P3T1085=m
++CONFIG_IIO_P3T1085_I2C=m
++CONFIG_IIO_P3T1085_I3C=m
++CONFIG_PWM=y
++CONFIG_PWM_ADP5585=y
++CONFIG_PWM_CROS_EC=m
++CONFIG_PWM_FSL_FTM=m
++CONFIG_PWM_IMX27=y
++CONFIG_PWM_IMX_TPM=y
++CONFIG_PWM_RPCHIP=y
++CONFIG_PWM_SL28CPLD=m
++CONFIG_SL28CPLD_INTC=y
++CONFIG_RESET_IMX7=y
++CONFIG_RESET_IMX8ULP_CSR=y
++CONFIG_RESET_IMX8ULP_SIM=y
++CONFIG_PHY_XGENE=y
++CONFIG_PHY_MIXEL_LVDS=y
++CONFIG_PHY_MIXEL_LVDS_COMBO=y
++CONFIG_PHY_CADENCE_SALVO=y
++CONFIG_PHY_FSL_IMX8MP_LVDS=y
++CONFIG_PHY_FSL_IMX9_DPHY_RX=y
++CONFIG_PHY_FSL_IMX93_MIPI_DPHY=y
++CONFIG_PHY_MIXEL_MIPI_DPHY=y
++CONFIG_PHY_FSL_IMX8M_PCIE=y
++CONFIG_PHY_FSL_SAMSUNG_HDMI_PHY=y
++CONFIG_PHY_FSL_IMX8QM_HSIO=y
++CONFIG_PHY_QCOM_USB_HS=y
++CONFIG_PHY_SAMSUNG_USB2=y
++CONFIG_ARM_CCI_PMU=m
++CONFIG_ARM_CCN=m
++CONFIG_ARM_CMN=m
++CONFIG_ARM_SMMU_V3_PMU=m
++CONFIG_ARM_DSU_PMU=m
++CONFIG_FSL_IMX8_DDR_PMU=y
++CONFIG_FSL_IMX9_DDR_PMU=y
++CONFIG_ARM_SPE_PMU=m
++CONFIG_ARM_DMC620_PMU=m
++CONFIG_HISI_PMU=y
++CONFIG_MALI_CSF_SUPPORT=y
++CONFIG_MALI_MIDGARD=y
++CONFIG_NVMEM_IMX_OCOTP=y
++CONFIG_NVMEM_IMX_OCOTP_SCU=y
++CONFIG_NVMEM_RMEM=m
++CONFIG_FPGA=y
++CONFIG_FPGA_BRIDGE=m
++CONFIG_ALTERA_FREEZE_BRIDGE=m
++CONFIG_FPGA_REGION=m
++CONFIG_OF_FPGA_REGION=m
++CONFIG_TEE=y
++CONFIG_OPTEE=y
++CONFIG_MUX_MMIO=y
++CONFIG_SLIM_QCOM_CTRL=m
++CONFIG_MXC_SIM=y
++CONFIG_MXC_GPU_VIV=y
++CONFIG_MXC_EMVSIM=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_BTRFS_FS=m
++CONFIG_BTRFS_FS_POSIX_ACL=y
++CONFIG_FANOTIFY=y
++CONFIG_FANOTIFY_ACCESS_PERMISSIONS=y
++CONFIG_QUOTA=y
++CONFIG_AUTOFS_FS=y
++CONFIG_FUSE_FS=m
++CONFIG_CUSE=m
++CONFIG_OVERLAY_FS=m
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_HUGETLBFS=y
++CONFIG_EFIVAR_FS=y
++CONFIG_JFFS2_FS=y
++CONFIG_UBIFS_FS=y
++CONFIG_SQUASHFS=y
++CONFIG_SQUASHFS_XZ=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_NFS_V4_2=y
++CONFIG_ROOT_NFS=y
++CONFIG_NFSD=y
++CONFIG_9P_FS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_TRUSTED_KEYS=m
++# CONFIG_TRUSTED_KEYS_TPM is not set
++# CONFIG_TRUSTED_KEYS_TEE is not set
++CONFIG_SECURITY=y
++CONFIG_CRYPTO_USER=y
++CONFIG_CRYPTO_TEST=m
++CONFIG_CRYPTO_ANUBIS=m
++CONFIG_CRYPTO_ARIA=m
++CONFIG_CRYPTO_BLOWFISH=m
++CONFIG_CRYPTO_CAMELLIA=m
++CONFIG_CRYPTO_CAST5=m
++CONFIG_CRYPTO_CAST6=m
++CONFIG_CRYPTO_FCRYPT=m
++CONFIG_CRYPTO_KHAZAD=m
++CONFIG_CRYPTO_SEED=m
++CONFIG_CRYPTO_SERPENT=m
++CONFIG_CRYPTO_TEA=m
++CONFIG_CRYPTO_TWOFISH=m
++CONFIG_CRYPTO_ARC4=m
++CONFIG_CRYPTO_CFB=m
++CONFIG_CRYPTO_CTS=m
++CONFIG_CRYPTO_LRW=m
++CONFIG_CRYPTO_OFB=m
++CONFIG_CRYPTO_PCBC=m
++CONFIG_CRYPTO_CHACHA20POLY1305=m
++CONFIG_CRYPTO_ECHAINIV=y
++CONFIG_CRYPTO_TLS=m
++CONFIG_CRYPTO_MD4=m
++CONFIG_CRYPTO_RMD160=m
++CONFIG_CRYPTO_STREEBOG=m
++CONFIG_CRYPTO_VMAC=m
++CONFIG_CRYPTO_WP512=m
++CONFIG_CRYPTO_XCBC=m
++CONFIG_CRYPTO_ANSI_CPRNG=y
++CONFIG_CRYPTO_USER_API_HASH=m
++CONFIG_CRYPTO_USER_API_SKCIPHER=m
++CONFIG_CRYPTO_USER_API_RNG=m
++CONFIG_CRYPTO_USER_API_AEAD=m
++CONFIG_CRYPTO_CHACHA20_NEON=m
++CONFIG_CRYPTO_GHASH_ARM64_CE=y
++CONFIG_CRYPTO_SHA1_ARM64_CE=y
++CONFIG_CRYPTO_SHA2_ARM64_CE=y
++CONFIG_CRYPTO_SHA512_ARM64_CE=m
++CONFIG_CRYPTO_SHA3_ARM64=m
++CONFIG_CRYPTO_SM3_ARM64_CE=m
++CONFIG_CRYPTO_POLYVAL_ARM64_CE=m
++CONFIG_CRYPTO_MICHAEL_MIC=y
++CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
++CONFIG_CRYPTO_AES_ARM64_BS=m
++CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
++CONFIG_CRYPTO_CRCT10DIF_ARM64_CE=m
++CONFIG_CRYPTO_DEV_FSL_CAAM_SECVIO=m
++CONFIG_CRYPTO_DEV_FSL_CAAM=m
++CONFIG_CRYPTO_DEV_FSL_CAAM_SM_TEST=m
++CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=m
++CONFIG_CRYPTO_DEV_CCREE=m
++CONFIG_CRYPTO_DEV_HISI_SEC2=m
++CONFIG_CRYPTO_DEV_HISI_ZIP=m
++CONFIG_CRYPTO_DEV_HISI_HPRE=m
++CONFIG_CRYPTO_DEV_HISI_TRNG=m
++CONFIG_CRYPTO_DEV_AMLOGIC_GXL=m
++CONFIG_INDIRECT_PIO=y
++CONFIG_CRC_CCITT=m
++CONFIG_CRC8=y
++CONFIG_SWIOTLB_DYNAMIC=y
++CONFIG_CMA_SIZE_MBYTES=32
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y
++CONFIG_DEBUG_INFO_REDUCED=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
++# CONFIG_FTRACE is not set
++CONFIG_CORESIGHT=y
++CONFIG_CORESIGHT_LINK_AND_SINK_TMC=y
++CONFIG_CORESIGHT_CATU=m
++CONFIG_CORESIGHT_SINK_TPIU=m
++CONFIG_CORESIGHT_SINK_ETBV10=m
++CONFIG_CORESIGHT_SOURCE_ETM4X=y
++CONFIG_CORESIGHT_STM=m
++CONFIG_CORESIGHT_CPU_DEBUG=m
++CONFIG_CORESIGHT_CTI=m
++CONFIG_MEMTEST=y
++# virtualization
++CONFIG_VHOST_NET=m
++CONFIG_VIDEO_MAX9286=y
++CONFIG_VIDEO_RDACM20=y
++
++# Add by EMTOP tech.
++CONFIG_RTC_DRV_PCF8563=m
++CONFIG_EXFAT_FS=m
++CONFIG_EXFAT_DEFAULT_IOCHARSET="utf8"
++CONFIG_NTFS_FS=m
++CONFIG_USB_SERIAL_CH341=y
++CONFIG_MAGIC_SYSRQ=n
++CONFIG_AUDIT=n
+diff --git a/arch/arm64/configs/imx_v8_defconfig b/arch/arm64/configs/imx_v8_defconfig
+index 0855e7ff3..633f422a3 100644
+--- a/arch/arm64/configs/imx_v8_defconfig
++++ b/arch/arm64/configs/imx_v8_defconfig
+@@ -1210,3 +1210,12 @@ CONFIG_MEMTEST=y
+ CONFIG_VHOST_NET=m
+ CONFIG_VIDEO_MAX9286=y
+ CONFIG_VIDEO_RDACM20=y
++
++# Add by EMTOP tech.
++CONFIG_RTC_DRV_PCF8563=m
++CONFIG_EXFAT_FS=m
++CONFIG_EXFAT_DEFAULT_IOCHARSET="utf8"
++CONFIG_NTFS_FS=m
++CONFIG_USB_SERIAL_CH341=y
++CONFIG_MAGIC_SYSRQ=n
++CONFIG_AUDIT=n
+diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+index 872e0b679..f14e84f22 100644
+--- a/drivers/rtc/rtc-ds1307.c
++++ b/drivers/rtc/rtc-ds1307.c
+@@ -11,7 +11,6 @@
+ #include <linux/bcd.h>
+ #include <linux/i2c.h>
+ #include <linux/init.h>
+-#include <linux/kstrtox.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/module.h>
+ #include <linux/property.h>
+@@ -47,6 +46,7 @@ enum ds_type {
+ 	m41t11,
+ 	mcp794xx,
+ 	rx_8025,
++	rx_8025t,
+ 	rx_8130,
+ 	last_ds_type /* always last */
+ 	/* rs5c372 too?  different address... */
+@@ -65,7 +65,6 @@ enum ds_type {
+ #	define DS1340_BIT_CENTURY_EN	0x80	/* in REG_HOUR */
+ #	define DS1340_BIT_CENTURY	0x40	/* in REG_HOUR */
+ #define DS1307_REG_WDAY		0x03	/* 01-07 */
+-#	define MCP794XX_BIT_OSCRUN	BIT(5)
+ #	define MCP794XX_BIT_VBATEN	0x08
+ #define DS1307_REG_MDAY		0x04	/* 01-31 */
+ #define DS1307_REG_MONTH	0x05	/* 01-12 */
+@@ -115,6 +114,36 @@ enum ds_type {
+ #	define RX8025_BIT_VDET		0x40
+ #	define RX8025_BIT_XST		0x20
+ 
++#define RX8025T_REG_SEC			0x00
++#define RX8025T_REG_MIN			0x01
++#define RX8025T_REG_HOUR		0x02
++#define RX8025T_REG_WEEK		0x03
++#define RX8025T_REG_DAY			0x04
++#define RX8025T_REG_MONTH		0x05
++#define RX8025T_REG_YEAR		0x06
++#define RX8025T_REG_EXT			0x0D
++#	define RX8025T_EXT_TSEL0	BIT(0)
++#	define RX8025T_EXT_TSEL1	BIT(1)
++#	define RX8025T_EXT_FSEL0	BIT(2)
++#	define RX8025T_EXT_FSEL1	BIT(3)
++#	define RX8025T_EXT_TE		BIT(4)
++#	define RX8025T_EXT_USEL		BIT(5)
++#	define RX8025T_EXT_WADA		BIT(6)
++#	define RX8025T_EXT_TEST		BIT(7)
++#define RX8025T_REG_FLAG		0x0E
++#	define RX8025T_FLAG_VDET	BIT(0)
++#	define RX8025T_FLAG_VLF		BIT(1)
++#	define RX8025T_FLAG_AF		BIT(3)
++#	define RX8025T_FLAG_TF		BIT(4)
++#	define RX8025T_FLAG_UF		BIT(5)
++#define RX8025T_REG_CTRL		0x0F
++#	define RX8025T_CTRL_RESET	BIT(0)
++#	define RX8025T_CTRL_AIE		BIT(3)
++#	define RX8025T_CTRL_TIE		BIT(4)
++#	define RX8025T_CTRL_UIE		BIT(5)
++#	define RX8025T_CTRL_CSEL0	BIT(6)
++#	define RX8025T_CTRL_CSEL1	BIT(7)
++
+ #define RX8130_REG_ALARM_MIN		0x17
+ #define RX8130_REG_ALARM_HOUR		0x18
+ #define RX8130_REG_ALARM_WEEK_OR_DAY	0x19
+@@ -243,10 +272,6 @@ static int ds1307_get_time(struct device *dev, struct rtc_time *t)
+ 	    regs[DS1307_REG_MIN] & M41T0_BIT_OF) {
+ 		dev_warn_once(dev, "oscillator failed, set time!\n");
+ 		return -EINVAL;
+-	} else if (ds1307->type == mcp794xx &&
+-	    !(regs[DS1307_REG_WDAY] & MCP794XX_BIT_OSCRUN)) {
+-		dev_warn_once(dev, "oscillator failed, set time!\n");
+-		return -EINVAL;
+ 	}
+ 
+ 	tmp = regs[DS1307_REG_SECS];
+@@ -359,7 +384,7 @@ static int ds1307_set_time(struct device *dev, struct rtc_time *t)
+ 	regs[DS1307_REG_MONTH] = bin2bcd(t->tm_mon + 1);
+ 
+ 	/* assume 20YY not 19YY */
+-	tmp = t->tm_year % 100;
++	tmp = t->tm_year - 100;
+ 	regs[DS1307_REG_YEAR] = bin2bcd(tmp);
+ 
+ 	if (chip->century_enable_bit)
+@@ -1068,6 +1093,7 @@ static const struct i2c_device_id ds1307_id[] = {
+ 	{ "mcp7941x", mcp794xx },
+ 	{ "pt7c4338", ds_1307 },
+ 	{ "rx8025", rx_8025 },
++	{ "rx8025t", rx_8025t },
+ 	{ "isl12057", ds_1337 },
+ 	{ "rx8130", rx_8130 },
+ 	{ }
+@@ -1139,6 +1165,10 @@ static const struct of_device_id ds1307_of_match[] = {
+ 		.compatible = "epson,rx8025",
+ 		.data = (void *)rx_8025
+ 	},
++	{
++		.compatible = "epson,rx8025t",
++		.data = (void *)rx_8025t
++	},
+ 	{
+ 		.compatible = "isil,isl12057",
+ 		.data = (void *)ds_1337
+@@ -1224,7 +1254,8 @@ static ssize_t frequency_test_show(struct device *dev,
+ 
+ 	regmap_read(ds1307->regmap, M41TXX_REG_CONTROL, &ctrl_reg);
+ 
+-	return sysfs_emit(buf, (ctrl_reg & M41TXX_BIT_FT) ? "on\n" : "off\n");
++	return scnprintf(buf, PAGE_SIZE, (ctrl_reg & M41TXX_BIT_FT) ? "on\n" :
++			"off\n");
+ }
+ 
+ static DEVICE_ATTR_RW(frequency_test);
+@@ -1719,7 +1750,7 @@ static const struct regmap_config regmap_config = {
+ 
+ static int ds1307_probe(struct i2c_client *client)
+ {
+-	const struct i2c_device_id *id = i2c_client_get_device_id(client);
++	const struct i2c_device_id *id = i2c_match_id(ds1307_id, client);
+ 	struct ds1307		*ds1307;
+ 	const void		*match;
+ 	int			err = -ENODEV;
+@@ -1749,7 +1780,7 @@ static int ds1307_probe(struct i2c_client *client)
+ 
+ 	match = device_get_match_data(&client->dev);
+ 	if (match) {
+-		ds1307->type = (uintptr_t)match;
++		ds1307->type = (enum ds_type)match;
+ 		chip = &chips[ds1307->type];
+ 	} else if (id) {
+ 		chip = &chips[id->driver_data];
+@@ -1885,6 +1916,47 @@ static int ds1307_probe(struct i2c_client *client)
+ 				     DS1307_REG_HOUR << 4 | 0x08, hour);
+ 		}
+ 		break;
++
++	case rx_8025t: {
++		bool need_clear = false;
++
++		err = regmap_bulk_read(ds1307->regmap, RX8025T_REG_FLAG, regs, 1);
++		if (err) {
++			dev_dbg(ds1307->dev, "read error %d\n", err);
++			goto exit;
++		}
++
++		/* oscillator off?  turn it on, so clock can tick. */
++		if (regs[0] & RX8025T_FLAG_VLF) {
++			dev_warn(ds1307->dev, "voltage drop detected\n");
++		}
++
++		if (regs[0] & RX8025T_FLAG_AF) {
++			need_clear = true;
++			dev_warn(ds1307->dev, "alarm flag detected\n");
++		}
++
++		if (regs[0] & RX8025T_FLAG_TF) {
++			need_clear = true;
++			dev_warn(ds1307->dev, "timer flag detected\n");
++		}
++
++		if (regs[0] & RX8025T_FLAG_UF) {
++			need_clear = true;
++			dev_warn(ds1307->dev, "update flag detected\n");
++		}
++
++		if (need_clear) {
++			regs[0] &= ~(RX8025T_FLAG_VLF | RX8025T_FLAG_AF | RX8025T_FLAG_TF
++				| RX8025T_FLAG_UF);
++			err = regmap_bulk_write(ds1307->regmap, RX8025T_REG_FLAG, regs, 1);
++			if (err) {
++				dev_dbg(ds1307->dev, "write error %d\n", err);
++				goto exit;
++			}
++		}
++		break;
++	}
+ 	case ds_1388:
+ 		err = regmap_read(ds1307->regmap, DS1388_REG_CONTROL, &tmp);
+ 		if (err) {
+@@ -1929,6 +2001,7 @@ static int ds1307_probe(struct i2c_client *client)
+ 		 */
+ 		break;
+ 	case rx_8025:
++	case rx_8025t:
+ 		break;
+ 	default:
+ 		if (!(tmp & DS1307_BIT_12HR))
+@@ -2014,7 +2087,6 @@ static int ds1307_probe(struct i2c_client *client)
+ static struct i2c_driver ds1307_driver = {
+ 	.driver = {
+ 		.name	= "rtc-ds1307",
+-		.of_match_table = ds1307_of_match,
+ 	},
+ 	.probe		= ds1307_probe,
+ 	.id_table	= ds1307_id,
